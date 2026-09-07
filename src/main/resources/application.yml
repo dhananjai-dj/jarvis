@@ -1,0 +1,7 @@
+spring:
+  ai:
+    openai:
+      base-url: http://192.168.1.7:1234/v1
+      api-key: lm-studio
+      chat:
+        model: gemma-4-eb
