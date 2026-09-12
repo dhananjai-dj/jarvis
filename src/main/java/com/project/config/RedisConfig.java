@@ -18,20 +18,7 @@ public class RedisConfig {
     @Bean
     public RedisTemplate<String, Object> getRedisTemplate(RedisConnectionFactory redisConnectionFactory) {
 
-        PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
-                .allowIfSubType("com.project.dao.entities.")
-                .allowIfSubType("java.util.")
-                .allowIfSubType("java.time.")
-                .allowIfSubType("java.sql.")
-                .build();
-
-        ObjectMapper objectMapper = JsonMapper.builder()
-                .activateDefaultTyping(ptv, DefaultTyping.NON_FINAL)
-                .build();
-
-        GenericJacksonJsonRedisSerializer jsonSerializer =
-                new GenericJacksonJsonRedisSerializer(objectMapper);
-
+        GenericJacksonJsonRedisSerializer jsonSerializer = getJsonSerializer();
         RedisTemplate<String, Object> template = new RedisTemplate<>();
         template.setConnectionFactory(redisConnectionFactory);
         template.setKeySerializer(new StringRedisSerializer());
@@ -40,5 +27,18 @@ public class RedisConfig {
         template.setHashValueSerializer(jsonSerializer);
         template.afterPropertiesSet();
         return template;
+    }
+
+    private GenericJacksonJsonRedisSerializer getJsonSerializer() {
+        PolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
+                .allowIfSubType("com.project.dao.entities.")
+                .allowIfSubType("java.util.")
+                .allowIfSubType("java.time.")
+                .allowIfSubType("java.sql.")
+                .build();
+        ObjectMapper objectMapper = JsonMapper.builder()
+                .activateDefaultTyping(ptv, DefaultTyping.NON_FINAL)
+                .build();
+        return new GenericJacksonJsonRedisSerializer(objectMapper);
     }
 }

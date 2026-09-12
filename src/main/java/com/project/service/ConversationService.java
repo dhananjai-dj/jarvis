@@ -44,4 +44,13 @@ public class ConversationService {
         }
         return null;
     }
+
+    public List<Conversation> getAllConversation(){
+        try {
+            return conversationRepository.findAll();
+        } catch (Exception e) {
+            logger.error("Error in fetching all conversation");
+        }
+        return null;
+    }
 }

@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 
 @Service
 public class SessionService {
@@ -54,4 +55,12 @@ public class SessionService {
         return null;
     }
 
+    public List<Session> getAllSession() {
+        try {
+            return userSessionRepository.findAll();
+        } catch (Exception e) {
+            logger.error("Error in fetching all sessions {}", e.getMessage());
+        }
+        return null;
+    }
 }
