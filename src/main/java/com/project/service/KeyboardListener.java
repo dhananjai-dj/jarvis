@@ -56,9 +56,9 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
                 logger.error("Error in starting the recording {}", e.getMessage());
             }
         } else if (event.getKeyCode() == NativeKeyEvent.VC_ESCAPE && !recording) {
-            sessionId = null;
             orchestrator.saveSummary(sessionId);
             orchestrator.stopSpeech();
+            sessionId = null;
         }
     }
 

@@ -94,9 +94,9 @@ public class Orchestrator {
         try {
             previousConversation = cacheService.getSessionConversation(sessionId);
             if (previousConversation == null) {
+                logger.info("Trying to fetch value from db");
                 previousConversation = conversationService.getPreviousConversations(sessionId);
             }
-            logger.info("Error found in fetching value from cache trying to fetch from DB");
             return previousConversation;
         } catch (Exception e) {
             logger.error("Error in fetching the previous conversation");
