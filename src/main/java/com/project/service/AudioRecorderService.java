@@ -13,9 +13,9 @@ import javax.sound.sampled.TargetDataLine;
 import java.io.File;
 
 @Service
-public class MicRecorderService {
+public class AudioRecorderService {
 
-    private static final Logger logger = LoggerFactory.getLogger(MicRecorderService.class);
+    private static final Logger logger = LoggerFactory.getLogger(AudioRecorderService.class);
 
     private Thread captureThread;
     private TargetDataLine microphone;

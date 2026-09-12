@@ -16,19 +16,23 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
     private static final Logger logger = LoggerFactory.getLogger(KeyboardListener.class);
 
     private final Orchestrator orchestrator;
-    private final MicRecorderService micRecorderService;
+    private final AudioRecorderService audioRecorderService;
 
     private volatile boolean recording = false;
+    private volatile boolean isNewSession = false;
+    private volatile String sessionId = null;
 
-    public KeyboardListener(Orchestrator orchestrator, MicRecorderService micRecorderService) {
+    public KeyboardListener(Orchestrator orchestrator, AudioRecorderService audioRecorderService) {
         this.orchestrator = orchestrator;
-        this.micRecorderService = micRecorderService;
+        this.audioRecorderService = audioRecorderService;
     }
 
     @Override
     public void run(String @NonNull ... args) throws Exception {
         java.util.logging.Logger logger = java.util.logging.Logger.getLogger(GlobalScreen.class.getPackage().getName());
         logger.setLevel(java.util.logging.Level.WARNING);
+        sessionId = String.valueOf(System.currentTimeMillis());
+        isNewSession = true;
         GlobalScreen.registerNativeHook();
         GlobalScreen.addNativeKeyListener(this);
         logger.info("Press and hold s to record");
@@ -37,15 +41,23 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
     @Override
     public void nativeKeyPressed(NativeKeyEvent event) {
         if (event.getKeyCode() == NativeKeyEvent.VC_ALT && event.getKeyLocation() == NativeKeyEvent.KEY_LOCATION_RIGHT && !recording) {
+            if (!isNewSession) {
+                sessionId = String.valueOf(System.currentTimeMillis());
+                isNewSession = true;
+            } else {
+                isNewSession = false;
+            }
             try {
                 logger.info("Recording started");
                 orchestrator.stopSpeech();
-                micRecorderService.startRecording();
+                audioRecorderService.startRecording();
                 recording = true;
             } catch (Exception e) {
                 logger.error("Error in starting the recording {}", e.getMessage());
             }
-        } else if (event.getKeyCode() == NativeKeyEvent.VC_CONTROL && event.getKeyLocation() == NativeKeyEvent.KEY_LOCATION_RIGHT && !recording) {
+        } else if (event.getKeyCode() == NativeKeyEvent.VC_ESCAPE && !recording) {
+            sessionId = null;
+            orchestrator.saveSummary(sessionId);
             orchestrator.stopSpeech();
         }
     }
@@ -55,9 +67,9 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
         if (event.getKeyCode() == NativeKeyEvent.VC_ALT && event.getKeyLocation() == NativeKeyEvent.KEY_LOCATION_RIGHT && recording) {
             try {
                 logger.info("Recording stopped. Transcribing...");
-                var wav = micRecorderService.stopRecording();
+                var wav = audioRecorderService.stopRecording();
                 recording = false;
-                new Thread(() -> orchestrator.respond(wav)).start();
+                new Thread(() -> orchestrator.respond(wav, sessionId, isNewSession)).start();
             } catch (Exception e) {
                 logger.error("Error in stopping the recording {}", e.getMessage());
             }

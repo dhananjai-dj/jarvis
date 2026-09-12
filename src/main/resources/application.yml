@@ -1,7 +1,25 @@
 spring:
   ai:
     openai:
-      base-url: http://192.168.1.7:1234/v1
-      api-key: lm-studio
+      base-url: https://api.groq.com/openai/v1
+      api-key: gsk_a0ucT2b5IRSyilWqy1sPWGdyb3FYmEatx8FdsUDOPFjZDjY9CEtz1
       chat:
-        model: gemma-4-eb
+        model: qwen/qwen3.8-27b
+        max-retries: 1
+    retry:
+      max-attempts: 1
+  datasource:
+    url: jdbc:postgresql://localhost:5432/jarvis
+    username: dhananjai_dj
+    password: Ammu123*
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: true
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+  data:
+    redis:
+      host: localhost
+      port: 6379
