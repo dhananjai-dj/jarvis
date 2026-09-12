@@ -111,6 +111,7 @@ public class Orchestrator {
             List<Conversation> previousConversations = getPreviousConversation(sessionId);
             stringJoiner.add(ParserUtil.parseConversationListToString(previousConversations));
             stringJoiner.add("]\n Current User message \n" + query);
+            logger.info("Combined query fetched successfully {}", stringJoiner.toString());
             return stringJoiner.toString();
         } catch (Exception e) {
             logger.error("Error in getting previous conversation from cache {}", e.getMessage());

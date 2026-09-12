@@ -33,7 +33,7 @@ public class CacheService {
             combinedConversationList.addAll(conversationList);
             cacheMap.put(Constants.CONVERSATION_CACHE_KEY, sessionId, combinedConversationList);
         } catch (Exception e) {
-            logger.error("Error in putting into cache for the session {} and the conversation {}", sessionId, conversationList);
+            logger.error("Error in putting into cache for the session {} and the conversation {} with error {}", sessionId, conversationList, e.getMessage());
         }
     }
 
@@ -42,8 +42,8 @@ public class CacheService {
             List<Conversation> list = cacheMap.get(Constants.CONVERSATION_CACHE_KEY, sessionId);
             return list != null ? list : new ArrayList<>();
         } catch (Exception e) {
-            logger.error("Error in fetching the conversation for this session {}", sessionId);
+            logger.error("Error in fetching the conversation for this session {} with error {}", sessionId, e.getMessage());
         }
-        return null;
+        return new ArrayList<Conversation>();
     }
 }
