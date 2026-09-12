@@ -16,6 +16,7 @@ public class Conversation {
     private long id;
     String sessionId;
     private String role;
+    @Column(columnDefinition = "TEXT")
     private String message;
     private boolean isLLMSuccess;
 

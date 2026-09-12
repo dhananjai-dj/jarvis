@@ -32,7 +32,6 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
         java.util.logging.Logger logger = java.util.logging.Logger.getLogger(GlobalScreen.class.getPackage().getName());
         logger.setLevel(java.util.logging.Level.WARNING);
         sessionId = String.valueOf(System.currentTimeMillis());
-        isNewSession = true;
         GlobalScreen.registerNativeHook();
         GlobalScreen.addNativeKeyListener(this);
         logger.info("Press and hold s to record");

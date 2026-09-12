@@ -1,5 +1,6 @@
 package com.project.dao.entities;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import org.hibernate.annotations.CreationTimestamp;
@@ -12,16 +13,20 @@ public class Session {
     private String id;
     private String firstMessage;
 
+    @Column(columnDefinition = "TEXT")
     public String getFirstMessage() {
         return firstMessage;
     }
 
+    @Column(columnDefinition = "TEXT")
+    private String summary;
+
+    @CreationTimestamp
+    private Timestamp creationTime;
+
     public void setFirstMessage(String firstMessage) {
         this.firstMessage = firstMessage;
     }
-
-    private String summary;
-
     public String getSummary() {
         return summary;
     }
@@ -29,9 +34,6 @@ public class Session {
     public void setSummary(String summary) {
         this.summary = summary;
     }
-
-    @CreationTimestamp
-    private Timestamp creationTime;
 
     public Timestamp getEndTime() {
         return endTime;
