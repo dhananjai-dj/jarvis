@@ -2,7 +2,7 @@ spring:
   ai:
     openai:
       base-url: https://api.groq.com/openai/v1
-      api-key: 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
+      api-key: ${API_KEY}
       chat:
         model: qwen/qwen3.8-27b
         max-retries: 1
