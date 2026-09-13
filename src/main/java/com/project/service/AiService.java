@@ -29,11 +29,11 @@ public class AiService {
             return LLMResponse.parseString(llmResponseString);
         } catch (Exception e) {
             logger.error("Error in getting LLM Response from Primary Agent{}", e.getMessage());
+            throw e;
         }
-        return LLMResponse.defaultResponse();
     }
 
-    public LLMResponse getResponseFromSecondaryAiAgent(String query) {
+    public LLMResponse getResponseFromSecondaryAiAgent(String query, Throwable t) {
         try {
             String llmResponseString = secondaryAgent.prompt().system(Constants.Prompts.SECONDARY_AGENT_SYSTEM_INSTRUCTION).user(query).call().content();
             return LLMResponse.parseString(llmResponseString);

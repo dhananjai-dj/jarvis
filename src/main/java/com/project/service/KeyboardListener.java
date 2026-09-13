@@ -31,7 +31,7 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
     public void run(String @NonNull ... args) throws Exception {
         java.util.logging.Logger logger = java.util.logging.Logger.getLogger(GlobalScreen.class.getPackage().getName());
         logger.setLevel(java.util.logging.Level.WARNING);
-        sessionId = String.valueOf(System.currentTimeMillis());
+        isNewSession = true;
         GlobalScreen.registerNativeHook();
         GlobalScreen.addNativeKeyListener(this);
         logger.info("Press and hold s to record");
@@ -40,12 +40,9 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
     @Override
     public void nativeKeyPressed(NativeKeyEvent event) {
         if (event.getKeyCode() == NativeKeyEvent.VC_ALT && event.getKeyLocation() == NativeKeyEvent.KEY_LOCATION_RIGHT && !recording) {
-            if (!isNewSession) {
-                sessionId = String.valueOf(System.currentTimeMillis());
-                isNewSession = true;
-            } else {
-                isNewSession = false;
-            }
+           if (isNewSession){
+               sessionId = String.valueOf(System.currentTimeMillis());
+           }
             try {
                 logger.info("Recording started");
                 orchestrator.stopSpeech();
@@ -54,9 +51,10 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
             } catch (Exception e) {
                 logger.error("Error in starting the recording {}", e.getMessage());
             }
-        } else if (event.getKeyCode() == NativeKeyEvent.VC_ESCAPE && !recording) {
+        } else if (event.getKeyCode() == NativeKeyEvent.VC_ESCAPE && !recording && !isNewSession) {
             orchestrator.saveSummary(sessionId);
             orchestrator.stopSpeech();
+            isNewSession = true;
             sessionId = null;
         }
     }
@@ -69,6 +67,7 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
                 var wav = audioRecorderService.stopRecording();
                 recording = false;
                 new Thread(() -> orchestrator.respond(wav, sessionId, isNewSession)).start();
+                isNewSession = false;
             } catch (Exception e) {
                 logger.error("Error in stopping the recording {}", e.getMessage());
             }
