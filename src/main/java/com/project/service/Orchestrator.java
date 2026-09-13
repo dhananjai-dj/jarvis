@@ -1,7 +1,9 @@
 package com.project.service;
 
 import com.project.dao.entities.Conversation;
+import com.project.dao.entities.Role;
 import com.project.dto.LLMResponse;
+import com.project.util.Constants;
 import com.project.util.ParserUtil;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -16,7 +18,7 @@ import java.util.StringJoiner;
 public class Orchestrator {
     private static final Logger logger = LoggerFactory.getLogger(Orchestrator.class);
 
-    private final LLMService llmService;
+    private final AiService aiService;
     private final Transcriber transcriber;
     private final Synthesizer synthesizer;
     private final CacheService cacheService;
@@ -24,8 +26,8 @@ public class Orchestrator {
     private final ConversationService conversationService;
 
 
-    public Orchestrator(Transcriber transcriber, LLMService llmService, Synthesizer synthesizer, CacheService cacheService, SessionService sessionService, ConversationService conversationService) {
-        this.llmService = llmService;
+    public Orchestrator(Transcriber transcriber, AiService aiService, Synthesizer synthesizer, CacheService cacheService, SessionService sessionService, ConversationService conversationService) {
+        this.aiService = aiService;
         this.transcriber = transcriber;
         this.synthesizer = synthesizer;
         this.cacheService = cacheService;
@@ -45,30 +47,21 @@ public class Orchestrator {
                 sessionService.createSession(sessionId, userQuery);
             }
 
-            Conversation userConversation = new Conversation();
-            userConversation.setRole("User");
-            userConversation.setMessage(userQuery);
-            userConversation.setSessionId(sessionId);
+            Conversation userConversation = Conversation.builder().isLLMSuccess(false).message(userQuery).role(Role.USER).sessionId(sessionId).build();
             conversationService.saveConversation(userConversation);
 
             String combinedConversation = finalUserQuery(sessionId, userQuery);
-            LLMResponse llmOutput = llmService.processUserQuery(combinedConversation);
+            LLMResponse llmOutput = processUserQuery(combinedConversation);
             logger.info("Output from ml: {}", llmOutput);
             String botReply = llmOutput.result();
 
-            Conversation botConversation = new Conversation();
-            botConversation.setRole("Bot");
-            botConversation.setSessionId(sessionId);
-            botConversation.setMessage(botReply);
-            botConversation.setLLMSuccess(llmOutput.isError());
-
+            Conversation botConversation = Conversation.builder().isLLMSuccess(llmOutput.isError()).message(botReply).role(Role.BOT).sessionId(sessionId).build();
             conversationService.saveConversation(botConversation);
             synthesizer.stopSpeaking();
 
             cacheService.putToCache(sessionId, List.of(userConversation, botConversation));
             waitingThread.join();
 
-            logger.info("Responding to the question now");
             File outputFile = synthesizer.synthesize(botReply);
             synthesizer.speak(outputFile);
         } catch (Exception e) {
@@ -78,7 +71,7 @@ public class Orchestrator {
 
     public void saveSummary(String sessionId) {
         try {
-            String summary = llmService.getSessionSummary(sessionId);
+            String summary = getSessionSummary(sessionId);
             sessionService.saveSessionSummary(sessionId, summary);
         } catch (Exception e) {
             logger.error("Error in saving the summary {}", e.getMessage());
@@ -87,21 +80,6 @@ public class Orchestrator {
 
     public void stopSpeech() {
         synthesizer.stopSpeaking();
-    }
-
-    public List<Conversation> getPreviousConversation(String sessionId) {
-        List<Conversation> previousConversation = new ArrayList<>();
-        try {
-            previousConversation = cacheService.getSessionConversation(sessionId);
-            if (previousConversation == null) {
-                logger.info("Trying to fetch value from db");
-                previousConversation = conversationService.getPreviousConversations(sessionId);
-            }
-            return previousConversation;
-        } catch (Exception e) {
-            logger.error("Error in fetching the previous conversation");
-        }
-        return previousConversation;
     }
 
     private String finalUserQuery(String sessionId, String query) {
@@ -117,6 +95,44 @@ public class Orchestrator {
             logger.error("Error in getting previous conversation from cache {}", e.getMessage());
         }
         return query;
+    }
+
+    private LLMResponse processUserQuery(String finalQuery) {
+        try {
+            return aiService.getResponseFromAiAgent(finalQuery);
+        } catch (Exception e) {
+            logger.error("Error in processing User query {}", e.getMessage());
+        }
+        return LLMResponse.defaultResponse();
+    }
+
+    private List<Conversation> getPreviousConversation(String sessionId) {
+        List<Conversation> previousConversation = new ArrayList<>();
+        try {
+            previousConversation = cacheService.getSessionConversation(sessionId);
+            if (previousConversation == null) {
+                logger.info("Trying to fetch value from db");
+                previousConversation = conversationService.getPreviousConversations(sessionId);
+            }
+            return previousConversation;
+        } catch (Exception e) {
+            logger.error("Error in fetching the previous conversation");
+        }
+        return previousConversation;
+    }
+
+    private String getSessionSummary(String sessionId) {
+        String result = "Unable to save session";
+        try {
+            List<Conversation> conversationList = conversationService.getAllConversationOfTheSession(sessionId);
+            if (conversationList != null) {
+                String combinedConversationString = ParserUtil.parseConversationListToString(conversationList);
+                result = aiService.getResponseFromLocalAiAgent(combinedConversationString, Constants.Prompts.SUMMARY_INSTRUCTION);
+            }
+        } catch (Exception e) {
+            logger.error("Error in generating summary for the session with session Id {}", sessionId);
+        }
+        return result;
     }
 
 
