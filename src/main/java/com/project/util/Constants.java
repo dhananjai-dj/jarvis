@@ -4,7 +4,7 @@ public class Constants {
 
     public static final String CONVERSATION_CACHE_KEY = "REDIS_CONVERSATION_CACHE";
 
-    public static final String INPUT_RECORDING_FILE_NAME = "/tts-output.wav";
+    public static final String INPUT_RECORDING_FILE_NAME = "/stt-inpur.wav";
     public static final String OUTPUT_RECORDING_FILE_NAME = "/tts-output.wav";
 
     public static final String PIPER_PATH = "/Users/dhananjai_dj/dev/piper-venv/bin/piper";
