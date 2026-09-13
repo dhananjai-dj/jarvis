@@ -2,7 +2,7 @@ spring:
   ai:
     openai:
       base-url: https://api.groq.com/openai/v1
-      api-key: ${API_KEY}
+      api-key: ${GROQ_API_KEY}
       chat:
         model: qwen/qwen3.8-27b
   cloud:
@@ -15,8 +15,8 @@ spring:
       port: 6379
   datasource:
     url: jdbc:postgresql://localhost:5432/jarvis
-    username: dhananjai_dj
-    password: Ammu123*
+    username: jarvis
+    password: IamIronMan
   jpa:
     hibernate:
       ddl-auto: update
