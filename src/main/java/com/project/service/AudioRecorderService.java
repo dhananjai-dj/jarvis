@@ -1,5 +1,6 @@
 package com.project.service;
 
+import com.project.util.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -21,13 +22,15 @@ public class AudioRecorderService {
     private TargetDataLine microphone;
     private volatile boolean recording = false;
 
-    private final File outputFile = new File("stt-input.wav");
 
-    public synchronized void startRecording() {
+    private File outputFile = null;
+
+    public synchronized void startRecording(String filePath) {
         try {
             if (recording) {
                 throw new IllegalStateException("Already recording");
             }
+            outputFile = new File(filePath + Constants.INPUT_RECORDING_FILE_NAME);
             AudioFormat format = new AudioFormat(16000.0f, 16, 1, true, false);
             DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
             microphone = (TargetDataLine) AudioSystem.getLine(info);

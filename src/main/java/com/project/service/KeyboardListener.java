@@ -3,11 +3,15 @@ package com.project.service;
 import com.github.kwhat.jnativehook.GlobalScreen;
 import com.github.kwhat.jnativehook.keyboard.NativeKeyEvent;
 import com.github.kwhat.jnativehook.keyboard.NativeKeyListener;
+import com.project.util.Constants;
 import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Service;
+
+import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 
 
 @Service
@@ -18,9 +22,10 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
     private final Orchestrator orchestrator;
     private final AudioRecorderService audioRecorderService;
 
-    private volatile boolean recording = false;
-    private volatile boolean isNewSession = false;
-    private volatile String sessionId = null;
+    private final AtomicBoolean recording = new AtomicBoolean();
+    private final AtomicBoolean isNewSession = new AtomicBoolean();
+    private final AtomicInteger count = new AtomicInteger(0);
+    private String sessionId = null;
 
     public KeyboardListener(Orchestrator orchestrator, AudioRecorderService audioRecorderService) {
         this.orchestrator = orchestrator;
@@ -31,7 +36,7 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
     public void run(String @NonNull ... args) throws Exception {
         java.util.logging.Logger logger = java.util.logging.Logger.getLogger(GlobalScreen.class.getPackage().getName());
         logger.setLevel(java.util.logging.Level.WARNING);
-        isNewSession = true;
+        isNewSession.set(true);
         GlobalScreen.registerNativeHook();
         GlobalScreen.addNativeKeyListener(this);
         logger.info("Press and hold s to record");
@@ -39,35 +44,37 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
 
     @Override
     public void nativeKeyPressed(NativeKeyEvent event) {
-        if (event.getKeyCode() == NativeKeyEvent.VC_ALT && event.getKeyLocation() == NativeKeyEvent.KEY_LOCATION_RIGHT && !recording) {
-           if (isNewSession){
-               sessionId = String.valueOf(System.currentTimeMillis());
-           }
+        if (event.getKeyCode() == NativeKeyEvent.VC_ALT && event.getKeyLocation() == NativeKeyEvent.KEY_LOCATION_RIGHT && !recording.get()) {
+            if (isNewSession.get()) {
+                sessionId = String.valueOf(System.currentTimeMillis());
+            }
+            count.set(count.get() + 1);
             try {
                 logger.info("Recording started");
                 orchestrator.stopSpeech();
-                audioRecorderService.startRecording();
-                recording = true;
+                audioRecorderService.startRecording(Constants.RECORDING_PATH_PREFIX + sessionId + "/" + count.get());
+                recording.set(true);
             } catch (Exception e) {
                 logger.error("Error in starting the recording {}", e.getMessage());
             }
-        } else if (event.getKeyCode() == NativeKeyEvent.VC_ESCAPE && !recording && !isNewSession) {
+        } else if (event.getKeyCode() == NativeKeyEvent.VC_ESCAPE && !recording.get() && !isNewSession.get()) {
             orchestrator.saveSummary(sessionId);
             orchestrator.stopSpeech();
-            isNewSession = true;
+            isNewSession.set(true);
             sessionId = null;
+            count.set(0);
         }
     }
 
     @Override
     public void nativeKeyReleased(NativeKeyEvent event) {
-        if (event.getKeyCode() == NativeKeyEvent.VC_ALT && event.getKeyLocation() == NativeKeyEvent.KEY_LOCATION_RIGHT && recording) {
+        if (event.getKeyCode() == NativeKeyEvent.VC_ALT && event.getKeyLocation() == NativeKeyEvent.KEY_LOCATION_RIGHT && recording.get()) {
             try {
                 logger.info("Recording stopped. Transcribing...");
                 var wav = audioRecorderService.stopRecording();
-                recording = false;
-                new Thread(() -> orchestrator.respond(wav, sessionId, isNewSession)).start();
-                isNewSession = false;
+                new Thread(() -> orchestrator.respond(wav, sessionId, Constants.RECORDING_PATH_PREFIX + sessionId + "/" + count.get(), isNewSession.get())).start();
+                recording.set(false);
+                isNewSession.set(false);
             } catch (Exception e) {
                 logger.error("Error in stopping the recording {}", e.getMessage());
             }

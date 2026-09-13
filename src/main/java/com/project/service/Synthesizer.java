@@ -1,6 +1,7 @@
 package com.project.service;
 
 
+import com.project.util.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -15,8 +16,7 @@ public class Synthesizer {
     private static final Logger logger = LoggerFactory.getLogger(Synthesizer.class);
 
     private final File waitMessageFile = new File("waiting_message.wav");
-    private static final String PIPER_PATH = "/Users/dhananjai_dj/dev/piper-venv/bin/piper";
-    private static final String MODEL_PATH = "/Users/dhananjai_dj/dev/piper/voices/en_US-ryan-medium.onnx";
+
     private SourceDataLine speaker;
 
     private volatile boolean stopRequested = false;
@@ -29,11 +29,11 @@ public class Synthesizer {
         return this.stopRequested;
     }
 
-    public File synthesize(String text) throws IOException, InterruptedException {
-        File outputFile = new File("tts-output.wav");
+    public File synthesize(String text, String filePath) throws IOException, InterruptedException {
+        File outputFile = new File(filePath + Constants.OUTPUT_RECORDING_FILE_NAME);
         ProcessBuilder processBuilder = new ProcessBuilder(
-                PIPER_PATH,
-                "--model", MODEL_PATH,
+                Constants.PIPER_PATH,
+                "--model", Constants.MODEL_PATH,
                 "--output_file", outputFile.getAbsolutePath()
         );
         processBuilder.redirectErrorStream(false);
@@ -77,7 +77,7 @@ public class Synthesizer {
         }
     }
 
-    public void playWaitingMessage(){
+    public void playWaitingMessage() {
         logger.info("Playing waiting message");
         try {
             while (!isStopRequested()) {
@@ -89,6 +89,7 @@ public class Synthesizer {
         }
         logger.info("Waiting message stopped");
     }
+
     public void stopSpeaking() {
         try {
             if (!isStopRequested() && speaker == null) {

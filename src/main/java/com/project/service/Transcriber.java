@@ -27,6 +27,9 @@ public class Transcriber {
     public String transcribe(File wavFile) {
         String result = "";
         try {
+            if (wavFile == null) {
+                return "Unable to find the file to transcribe";
+            }
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("file", new FileSystemResource(wavFile));
             body.add("response_format", "json");
@@ -40,6 +43,6 @@ public class Transcriber {
         } catch (Exception e) {
             logger.error("Error in transcribing the file {} because {}", wavFile.getName(), e.getMessage());
         }
-        return  result;
+        return result;
     }
 }

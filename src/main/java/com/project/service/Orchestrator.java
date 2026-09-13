@@ -35,7 +35,7 @@ public class Orchestrator {
         this.conversationService = conversationService;
     }
 
-    public void respond(File wav, String sessionId, boolean isNewSession) {
+    public void respond(File wav, String sessionId, String filePath, boolean isNewSession) {
         try {
             synthesizer.resetStop();
             Thread waitingThread = new Thread(synthesizer::playWaitingMessage);
@@ -47,7 +47,7 @@ public class Orchestrator {
                 sessionService.createSession(sessionId, userQuery);
             }
 
-            Conversation userConversation = Conversation.builder().isLLMSuccess(false).message(userQuery).role(Role.USER).sessionId(sessionId).build();
+            Conversation userConversation = Conversation.builder().isLLMSuccess(false).message(userQuery).role(Role.USER).sessionId(sessionId).filePath(filePath + Constants.INPUT_RECORDING_FILE_NAME).build();
             conversationService.saveConversation(userConversation);
 
             String combinedConversation = finalUserQuery(sessionId, userQuery);
@@ -55,14 +55,14 @@ public class Orchestrator {
             logger.info("Output from ml: {}", llmOutput);
             String botReply = llmOutput.result();
 
-            Conversation botConversation = Conversation.builder().isLLMSuccess(llmOutput.isError()).message(botReply).role(Role.BOT).sessionId(sessionId).build();
+            Conversation botConversation = Conversation.builder().isLLMSuccess(llmOutput.isError()).message(botReply).role(Role.BOT).sessionId(sessionId).filePath(filePath + Constants.OUTPUT_RECORDING_FILE_NAME).build();
             conversationService.saveConversation(botConversation);
             synthesizer.stopSpeaking();
 
             cacheService.putToCache(sessionId, List.of(userConversation, botConversation));
             waitingThread.join();
 
-            File outputFile = synthesizer.synthesize(botReply);
+            File outputFile = synthesizer.synthesize(botReply, filePath);
             synthesizer.speak(outputFile);
         } catch (Exception e) {
             logger.error("Error in responding {}", e.getMessage());

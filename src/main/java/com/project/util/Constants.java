@@ -4,6 +4,13 @@ public class Constants {
 
     public static final String CONVERSATION_CACHE_KEY = "REDIS_CONVERSATION_CACHE";
 
+    public static final String INPUT_RECORDING_FILE_NAME = "/tts-output.wav";
+    public static final String OUTPUT_RECORDING_FILE_NAME = "/tts-output.wav";
+
+    public static final String PIPER_PATH = "/Users/dhananjai_dj/dev/piper-venv/bin/piper";
+    public static final String MODEL_PATH = "/Users/dhananjai_dj/dev/piper/voices/en_US-ryan-medium.onnx";
+    public static final String RECORDING_PATH_PREFIX = "/Users/dhananjai_dj/Documents/jarvis/recordings/";
+
     public static class Prompts {
 
         public static final String SECONDARY_AGENT_SYSTEM_INSTRUCTION = """

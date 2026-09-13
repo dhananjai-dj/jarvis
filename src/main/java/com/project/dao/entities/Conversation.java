@@ -17,8 +17,8 @@ public class Conversation {
     private Role role;
     @Column(columnDefinition = "TEXT")
     private String message;
+    private String filePath;
     private boolean isLLMSuccess;
-
     @CreationTimestamp
     private Timestamp creationTime;
 
@@ -26,12 +26,11 @@ public class Conversation {
     }
 
     private Conversation(Builder builder) {
-        this.id = builder.id;
-        this.sessionId = builder.sessionId;
         this.role = builder.role;
         this.message = builder.message;
+        this.filePath = builder.filePath;
+        this.sessionId = builder.sessionId;
         this.isLLMSuccess = builder.isLLMSuccess;
-        this.creationTime = builder.creationTime;
     }
 
     public static Builder builder() {
@@ -39,17 +38,12 @@ public class Conversation {
     }
 
     public static class Builder {
-        private long id;
-        private String sessionId;
         private Role role;
         private String message;
+        private String filePath;
+        private String sessionId;
         private boolean isLLMSuccess;
-        private Timestamp creationTime;
 
-        public Builder id(long id) {
-            this.id = id;
-            return this;
-        }
 
         public Builder sessionId(String sessionId) {
             this.sessionId = sessionId;
@@ -71,8 +65,8 @@ public class Conversation {
             return this;
         }
 
-        public Builder creationTime(Timestamp creationTime) {
-            this.creationTime = creationTime;
+        public Builder filePath(String filePath) {
+            this.filePath = filePath;
             return this;
         }
 
