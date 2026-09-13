@@ -31,6 +31,7 @@ public class Synthesizer {
 
     public File synthesize(String text, String filePath) throws IOException, InterruptedException {
         File outputFile = new File(filePath + Constants.OUTPUT_RECORDING_FILE_NAME);
+        outputFile.getParentFile().mkdirs();
         ProcessBuilder processBuilder = new ProcessBuilder(
                 Constants.PIPER_PATH,
                 "--model", Constants.MODEL_PATH,

@@ -31,6 +31,7 @@ public class AudioRecorderService {
                 throw new IllegalStateException("Already recording");
             }
             outputFile = new File(filePath + Constants.INPUT_RECORDING_FILE_NAME);
+            outputFile.getParentFile().mkdirs();
             AudioFormat format = new AudioFormat(16000.0f, 16, 1, true, false);
             DataLine.Info info = new DataLine.Info(TargetDataLine.class, format);
             microphone = (TargetDataLine) AudioSystem.getLine(info);
