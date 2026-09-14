@@ -72,9 +72,9 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
             try {
                 logger.info("Recording stopped. Transcribing...");
                 var wav = audioRecorderService.stopRecording();
-                new Thread(() -> orchestrator.respond(wav, sessionId, Constants.RECORDING_PATH_PREFIX + sessionId + "/" + count.get(), isNewSession.get())).start();
+                boolean sessionState = isNewSession.getAndSet(false);
+                new Thread(() -> orchestrator.respond(wav, sessionId, Constants.RECORDING_PATH_PREFIX + sessionId + "/" + count.get(), sessionState)).start();
                 recording.set(false);
-                isNewSession.set(false);
             } catch (Exception e) {
                 logger.error("Error in stopping the recording {}", e.getMessage());
             }

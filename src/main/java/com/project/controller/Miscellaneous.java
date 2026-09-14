@@ -25,14 +25,9 @@ public class Miscellaneous {
         return transcriber.transcribe(file);
     }
 
-    @GetMapping("/tts")
-    public void getSpeech() throws Exception {
-       // synthesizer.synthesize("Welcome Boss");
-    }
-
     @GetMapping("/speak")
     public void speak() throws Exception {
-       // File wav = synthesizer.synthesize("Please wait While I am looking into it");
-       // synthesizer.speak(wav);
+        File wav = synthesizer.synthesize("Please wait While I am looking into it", "waiting_message.wav");
+        synthesizer.speak(wav);
     }
 }

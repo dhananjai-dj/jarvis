@@ -81,9 +81,9 @@ public class Synthesizer {
     public void playWaitingMessage() {
         logger.info("Playing waiting message");
         try {
-            while (!isStopRequested()) {
+            Thread.sleep(2000);
+            if (!isStopRequested()) {
                 speak(waitMessageFile);
-                Thread.sleep(2000);
             }
         } catch (Exception e) {
             logger.info("Waiting message stopped because of error");
