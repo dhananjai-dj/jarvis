@@ -4,6 +4,7 @@ import com.project.dao.entities.Conversation;
 import com.project.dao.entities.Session;
 import com.project.service.ConversationService;
 import com.project.service.SessionService;
+import io.github.resilience4j.core.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -31,10 +32,11 @@ public class Dashboard {
 
 
     @GetMapping("conversation")
-    public ResponseEntity<?> getAllConversation(@RequestParam String sessionId) {
+    public ResponseEntity<?> getAllConversation(@RequestParam(required = false) String sessionId) {
         try {
             List<Conversation> conversationList = null;
-            if (sessionId != null) {
+            logger.info(sessionId);
+            if (StringUtils.isNotEmpty(sessionId)) {
                 conversationList = conversationService.getAllConversationOfTheSession(sessionId);
             } else {
                 conversationList = conversationService.getAllConversation();
@@ -47,12 +49,14 @@ public class Dashboard {
     }
 
     @GetMapping("session")
-    public ResponseEntity<?> getSession(@RequestParam String sessionId) {
+    public ResponseEntity<?> getSession(@RequestParam(required = false) String sessionId) {
         try {
+            logger.info("session is {}", sessionId);
             List<Session> sessionList = null;
-            if (sessionId != null) {
+            if (StringUtils.isNotEmpty(sessionId)) {
                 sessionList = List.of(sessionService.getSessionBySessionId(sessionId));
             } else {
+                logger.info("Fetching all session");
                 sessionList = sessionService.getAllSession();
             }
             return new ResponseEntity<>(sessionList, HttpStatus.FOUND);
