@@ -3,8 +3,7 @@ package com.project.service;
 import com.project.dao.entities.Conversation;
 import com.project.dao.entities.Role;
 import com.project.dto.LLMResponse;
-import com.project.util.Constants;
-import com.project.util.ParserUtil;
+import com.project.util.*;
 import io.github.resilience4j.core.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,10 +30,10 @@ public class Orchestrator {
     private final SpotifyToolFilter spotifyToolFilter;
     private final ConversationService conversationService;
     private final ToolCallbackProvider toolCallbackProvider;
-    private final AudioRecorderService audioRecorderService;
+    private final RecordingService recordingService;
 
 
-    public Orchestrator(Transcriber transcriber, AiService aiService, Synthesizer synthesizer, CacheService cacheService, SessionService sessionService, SpotifyToolFilter spotifyToolFilter, ConversationService conversationService, ToolCallbackProvider toolCallbackProvider, AudioRecorderService audioRecorderService) {
+    public Orchestrator(Transcriber transcriber, AiService aiService, Synthesizer synthesizer, CacheService cacheService, SessionService sessionService, SpotifyToolFilter spotifyToolFilter, ConversationService conversationService, ToolCallbackProvider toolCallbackProvider, RecordingService recordingService) {
         this.aiService = aiService;
         this.transcriber = transcriber;
         this.synthesizer = synthesizer;
@@ -43,7 +42,7 @@ public class Orchestrator {
         this.spotifyToolFilter = spotifyToolFilter;
         this.conversationService = conversationService;
         this.toolCallbackProvider = toolCallbackProvider;
-        this.audioRecorderService = audioRecorderService;
+        this.recordingService = recordingService;
     }
 
     public void respond(File wav, String sessionId, String filePath, boolean isNewSession) {
@@ -85,12 +84,12 @@ public class Orchestrator {
 
     public void startRecording(String sessionId, int conversationCount) {
         logger.info("Recording started for the session {} with conversation of count {}", sessionId, conversationCount);
-        audioRecorderService.startRecording(Constants.RECORDING_PATH_PREFIX + sessionId + "/" + conversationCount);
+        recordingService.startRecording(Constants.RECORDING_PATH_PREFIX + sessionId + "/" + conversationCount);
     }
 
     public File stopRecording(String sessionId, int conversationCount) {
         logger.info("Recording stopped for the session {} with conversation of count {}", sessionId, conversationCount);
-        return audioRecorderService.stopRecording();
+        return recordingService.stopRecording();
     }
 
     public void stopSpeech() {

@@ -1,4 +1,4 @@
-package com.project.service;
+package com.project.util;
 
 import com.project.dto.WhisperResponse;
 import org.slf4j.Logger;

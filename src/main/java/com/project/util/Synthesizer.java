@@ -1,7 +1,6 @@
-package com.project.service;
+package com.project.util;
 
 
-import com.project.util.Constants;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;

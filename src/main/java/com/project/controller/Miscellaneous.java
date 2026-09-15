@@ -1,9 +1,8 @@
 package com.project.controller;
 
-import com.project.dto.LLMResponse;
 import com.project.service.AiService;
-import com.project.service.Synthesizer;
-import com.project.service.Transcriber;
+import com.project.util.Synthesizer;
+import com.project.util.Transcriber;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.beans.factory.annotation.Autowired;

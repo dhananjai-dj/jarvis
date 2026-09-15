@@ -1,4 +1,4 @@
-package com.project.service;
+package com.project.util;
 
 import com.project.dto.LLMResponse;
 import org.springframework.ai.tool.ToolCallback;
