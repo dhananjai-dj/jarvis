@@ -1,5 +1,13 @@
 spring:
   ai:
+    mcp:
+      client:
+        stdio:
+          connections:
+            spotify:
+              command: node
+              args:
+                - /Users/dhananjai_dj/dev/spotify-mcp-server/build/index.js
     openai:
       base-url: https://api.groq.com/openai/v1
       api-key: ${GROQ_API_KEY}

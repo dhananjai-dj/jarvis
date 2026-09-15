@@ -27,7 +27,7 @@ public class ChatClientConfig {
     @Bean(name = "secondaryAgent")
     public ChatClient getLocalChatClient() {
         OpenAiChatOptions chatOptions = OpenAiChatOptions.builder()
-                .baseUrl("http://10.194.138.219:1234/v1")
+                .baseUrl("http://192.168.1.7:1234/v1")
                 .apiKey("lm-studio")
                 .model("local-model")
                 .build();

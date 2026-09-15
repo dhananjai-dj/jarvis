@@ -21,8 +21,9 @@ public class CacheService {
         this.cacheMap = redisTemplate.opsForHash();
     }
 
-    public void putToCache(String sessionId, List<Conversation> conversationList) {
+    public void putToCache(Conversation conversation) {
         try {
+            String sessionId = conversation.getSessionId();
             List<Conversation> combinedConversationList;
             List<Conversation> previousConversationList = getSessionConversation(sessionId);
             if (previousConversationList.size() > 5) {
@@ -30,10 +31,10 @@ public class CacheService {
             } else {
                 combinedConversationList = new ArrayList<>(previousConversationList);
             }
-            combinedConversationList.addAll(conversationList);
+            combinedConversationList.add(conversation);
             cacheMap.put(Constants.CONVERSATION_CACHE_KEY, sessionId, combinedConversationList);
         } catch (Exception e) {
-            logger.error("Error in putting into cache for the session {} and the conversation {} with error {}", sessionId, conversationList, e.getMessage());
+            logger.error("Error in putting into cache for the session {} and the conversation {} with error {}", conversation.getSessionId(), conversation, e.getMessage());
         }
     }
 
@@ -44,6 +45,6 @@ public class CacheService {
         } catch (Exception e) {
             logger.error("Error in fetching the conversation for this session {} with error {}", sessionId, e.getMessage());
         }
-        return new ArrayList<Conversation>();
+        return new ArrayList<>();
     }
 }

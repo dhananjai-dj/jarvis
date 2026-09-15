@@ -6,8 +6,11 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 public class AiService {
@@ -23,9 +26,9 @@ public class AiService {
     }
 
     @CircuitBreaker(name = "aiService", fallbackMethod = "getResponseFromSecondaryAiAgent")
-    public LLMResponse getResponseFromAiAgent(String query) {
+    public LLMResponse getResponseFromAiAgent(String query, String prompt) {
         try {
-            String llmResponseString = primaryAgent.prompt().system(Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION).user(query).call().content();
+            String llmResponseString = primaryAgent.prompt().system(prompt).user(query).call().content();
             return LLMResponse.parseString(llmResponseString);
         } catch (Exception e) {
             logger.error("Error in getting LLM Response from Primary Agent{}", e.getMessage());
@@ -33,23 +36,22 @@ public class AiService {
         }
     }
 
-    public LLMResponse getResponseFromSecondaryAiAgent(String query, Throwable t) {
+    public LLMResponse getResponseFromSecondaryAiAgent(String query, String prompt, Throwable t) {
         try {
-            String llmResponseString = secondaryAgent.prompt().system(Constants.Prompts.SECONDARY_AGENT_SYSTEM_INSTRUCTION).user(query).call().content();
+            String llmResponseString = secondaryAgent.prompt().system(prompt).user(query).call().content();
             return LLMResponse.parseString(llmResponseString);
         } catch (Exception e) {
             logger.error("Error in getting LLM Response from Secondary Agent{}", e.getMessage());
         }
-        return LLMResponse.defaultResponse();
+        return new LLMResponse("Error in generating summary", false, true);
     }
 
-    public String getResponseFromLocalAiAgent(String query, String prompt) {
+    public String performToolCalling(String query, List<ToolCallback> tools) {
         try {
-            return secondaryAgent.prompt().system(prompt).user(query).call().content();
+            return primaryAgent.prompt().system(Constants.Prompts.TOOL_EXECUTION_SYSTEM_INSTRUCTION).user("Paro by Aditya Rikhari").tools(tools).call().content();
         } catch (Exception e) {
-            logger.error("Error in getting response from Secondary Agent{}", e.getMessage());
+            logger.info("Error in performing tool calling {}", e.getMessage());
         }
-        return "Error in generating summary";
+        return "Error in performing the action. Try again later";
     }
-
 }

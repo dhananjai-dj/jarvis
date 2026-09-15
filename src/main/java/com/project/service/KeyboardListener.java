@@ -20,16 +20,14 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
     private static final Logger logger = LoggerFactory.getLogger(KeyboardListener.class);
 
     private final Orchestrator orchestrator;
-    private final AudioRecorderService audioRecorderService;
 
     private final AtomicBoolean recording = new AtomicBoolean();
     private final AtomicBoolean isNewSession = new AtomicBoolean();
     private final AtomicInteger count = new AtomicInteger(0);
     private String sessionId = null;
 
-    public KeyboardListener(Orchestrator orchestrator, AudioRecorderService audioRecorderService) {
+    public KeyboardListener(Orchestrator orchestrator) {
         this.orchestrator = orchestrator;
-        this.audioRecorderService = audioRecorderService;
     }
 
     @Override
@@ -52,7 +50,7 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
             try {
                 logger.info("Recording started");
                 orchestrator.stopSpeech();
-                audioRecorderService.startRecording(Constants.RECORDING_PATH_PREFIX + sessionId + "/" + count.get());
+                orchestrator.startRecording(sessionId, count.get());
                 recording.set(true);
             } catch (Exception e) {
                 logger.error("Error in starting the recording {}", e.getMessage());
@@ -71,7 +69,7 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
         if (event.getKeyCode() == NativeKeyEvent.VC_ALT && event.getKeyLocation() == NativeKeyEvent.KEY_LOCATION_RIGHT && recording.get()) {
             try {
                 logger.info("Recording stopped. Transcribing...");
-                var wav = audioRecorderService.stopRecording();
+                var wav = orchestrator.stopRecording(sessionId, count.get());
                 boolean sessionState = isNewSession.getAndSet(false);
                 new Thread(() -> orchestrator.respond(wav, sessionId, Constants.RECORDING_PATH_PREFIX + sessionId + "/" + count.get(), sessionState)).start();
                 recording.set(false);
