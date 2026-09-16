@@ -48,7 +48,7 @@ public class AiService {
 
     public String performToolCalling(String query, List<ToolCallback> tools) {
         try {
-            return primaryAgent.prompt().system(Constants.Prompts.TOOL_EXECUTION_SYSTEM_INSTRUCTION).user("Paro by Aditya Rikhari").tools(tools).call().content();
+            return primaryAgent.prompt().system(Constants.Prompts.TOOL_EXECUTION_SYSTEM_INSTRUCTION).user(query).tools(tools).call().content();
         } catch (Exception e) {
             logger.info("Error in performing tool calling {}", e.getMessage());
         }

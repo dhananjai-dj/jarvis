@@ -40,11 +40,11 @@ public class Miscellaneous {
     }
 
     @GetMapping("/tool")
-    public void tool() {
+    public String tool(@RequestParam String query) {
         Set<String> wanted = Set.of("playMusic", "searchSpotify");
         List<ToolCallback> list = Arrays.stream(provider.getToolCallbacks())
                 .filter(tc -> wanted.contains(tc.getToolDefinition().name()))
                 .toList();
-        aiService.performToolCalling("", list);
+        return aiService.performToolCalling(query, list);
     }
 }
