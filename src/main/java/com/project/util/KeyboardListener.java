@@ -56,6 +56,7 @@ public class KeyboardListener implements CommandLineRunner, NativeKeyListener {
                 logger.error("Error in starting the recording {}", e.getMessage());
             }
         } else if (event.getKeyCode() == NativeKeyEvent.VC_ESCAPE && !recording.get() && !isNewSession.get()) {
+            PiiMasker.clear();
             orchestrator.saveSummary(sessionId);
             orchestrator.stopSpeech();
             isNewSession.set(true);

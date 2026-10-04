@@ -4,7 +4,6 @@ import com.project.dao.entities.Conversation;
 import com.project.dao.entities.Role;
 import com.project.dto.LLMResponse;
 import com.project.util.*;
-import io.github.resilience4j.core.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
@@ -47,13 +46,23 @@ public class Orchestrator {
 
     public void respond(File wav, String sessionId, String filePath, boolean isNewSession) {
         synthesizer.resetStop();
-        Thread waitingThread = new Thread(synthesizer::playWaitingMessage);
+        Thread waitingThread = new Thread(
+                () -> {
+                    try {
+                        Thread.sleep(5000);
+                        synthesizer.playWaitingMessage();
+                    } catch (InterruptedException e) {
+                        Thread.currentThread().interrupt();
+                    }
+                }
+        );
         waitingThread.start();
         try {
             String userQuery = transcriber.transcribe(wav);
-            if (!StringUtils.isNotEmpty(userQuery)) {
+            if (StringUtils.isEmpty(userQuery)) {
                 throw new RuntimeException("Empty transcriber response !!!");
             }
+            userQuery = PiiMasker.maskValue(userQuery);
             if (isNewSession) {
                 sessionService.createSession(sessionId, userQuery);
             }
@@ -68,13 +77,16 @@ public class Orchestrator {
             String botReply = llmOutput.result();
             logger.info("Output from ml: {}", llmOutput);
 
-            Conversation botConversation = Conversation.builder().isLLMSuccess(llmOutput.isError()).message(botReply).role(Role.BOT).sessionId(sessionId).filePath(filePath + Constants.OUTPUT_RECORDING_FILE_NAME).build();
-            conversationService.saveConversation(botConversation);
+            Conversation assistantConversation = Conversation.builder().isLLMSuccess(llmOutput.isError()).message(botReply).role(Role.ASSISTANT).sessionId(sessionId).filePath(filePath + Constants.OUTPUT_RECORDING_FILE_NAME).build();
+            conversationService.saveConversation(assistantConversation);
+            botReply = PiiMasker.unMaskValue(botReply);
 
             stopWaitingThread(waitingThread);
 
-            File outputFile = synthesizer.synthesize(botReply, filePath);
-            synthesizer.speak(outputFile);
+            if (!llmOutput.isToolCallingRequired() || llmOutput.isError()) {
+                File outputFile = synthesizer.synthesize(botReply, filePath);
+                synthesizer.speak(outputFile);
+            }
         } catch (Exception e) {
             stopWaitingThread(waitingThread);
             synthesizer.speak(errorMessageFile);
@@ -108,8 +120,12 @@ public class Orchestrator {
     /* Helper Methods */
     private void stopWaitingThread(Thread waitingThread) {
         try {
-            synthesizer.stopSpeaking();
-            waitingThread.join();
+            if (waitingThread != null) {
+                if (waitingThread.isAlive()) {
+                    waitingThread.interrupt();
+                }
+                synthesizer.stopSpeaking();
+            }
         } catch (Exception e) {
 
             logger.info("Error in stoping waiting thread {}", e.getMessage());
@@ -121,7 +137,7 @@ public class Orchestrator {
             StringJoiner stringJoiner = new StringJoiner("\n");
             stringJoiner.add("Previous Conversion History:[");
             List<Conversation> previousConversations = getPreviousConversation(sessionId);
-            stringJoiner.add(ParserUtil.parseConversationListToString(previousConversations));
+            stringJoiner.add(StringUtils.parseConversationListToString(previousConversations));
             stringJoiner.add("]\n Current User message \n" + query);
             return stringJoiner.toString();
         } catch (Exception e) {
@@ -136,7 +152,7 @@ public class Orchestrator {
             previousConversation = cacheService.getSessionConversation(sessionId);
             if (previousConversation == null) {
                 logger.info("Trying to fetch value from db");
-                previousConversation = conversationService.getPreviousConversations(sessionId);
+                previousConversation = conversationService.getAllConversationOfTheSession(sessionId);
             }
             return previousConversation;
         } catch (Exception e) {
@@ -157,9 +173,9 @@ public class Orchestrator {
             }
             List<ToolCallback> tools = spotifyToolFilter.getPlayRequestTools(toolCallbackProvider, toolCallResponse);
             if (!tools.isEmpty()) {
-                String toolCallingResponse = aiService.performToolCalling(finalQuery, tools);
+                LLMResponse toolCallingResponse = aiService.performToolCalling(finalQuery, tools);
                 logger.info("Tool calling response {}", toolCallingResponse);
-                return new LLMResponse(toolCallingResponse, false, false);
+                return toolCallingResponse;
             }
         } catch (Exception e) {
             logger.error("Error in processing User query {}", e.getMessage());
@@ -167,13 +183,13 @@ public class Orchestrator {
         return LLMResponse.defaultResponse();
     }
 
-    private String getSessionSummary(String sessionId) {
+    public String getSessionSummary(String sessionId) {
         String result = "Unable to save session";
         try {
             List<Conversation> conversationList = conversationService.getAllConversationOfTheSession(sessionId);
             if (conversationList != null) {
-                String combinedConversationString = ParserUtil.parseConversationListToString(conversationList);
-                result = aiService.getResponseFromSecondaryAiAgent(combinedConversationString, Constants.Prompts.SUMMARY_INSTRUCTION, null).result();
+                String combinedConversationString = StringUtils.parseConversationListToString(conversationList);
+                result = aiService.executeLLMCall(combinedConversationString, Constants.Prompts.SESSION_SUMMARY_INSTRUCTION, String.class);
             }
         } catch (Exception e) {
             logger.error("Error in generating summary for the session with session Id {}", sessionId);

@@ -5,7 +5,7 @@ import com.project.dao.entities.Conversation;
 import java.util.List;
 import java.util.StringJoiner;
 
-public class ParserUtil {
+public class StringUtils {
     public static String parseConversationListToString(List<Conversation> conversationList) {
         StringJoiner stringJoiner = new StringJoiner(",");
         for (Conversation conversation : conversationList) {
@@ -19,4 +19,13 @@ public class ParserUtil {
         }
         return stringJoiner.toString();
     }
+
+    public static boolean isNotEmpty(String str){
+        return str != null && !str.isEmpty();
+    }
+
+    public static boolean isEmpty(String str){
+        return str == null || str.isEmpty();
+    }
+
 }

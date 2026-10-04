@@ -2,6 +2,7 @@ package com.project.service;
 
 import com.project.dao.entities.Conversation;
 import com.project.util.Constants;
+import com.project.util.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.HashOperations;
@@ -16,26 +17,31 @@ public class CacheService {
     private final HashOperations<String, String, List<Conversation>> cacheMap;
     private final Logger logger = LoggerFactory.getLogger(CacheService.class);
 
+    private final AiService aiService;
 
-    public CacheService(RedisTemplate<String, Object> redisTemplate) {
+
+    public CacheService(RedisTemplate<String, Object> redisTemplate, AiService aiService) {
         this.cacheMap = redisTemplate.opsForHash();
+        this.aiService = aiService;
     }
 
-    public void putToCache(Conversation conversation) {
+    public Conversation putToCache(Conversation conversation) {
         try {
             String sessionId = conversation.getSessionId();
-            List<Conversation> combinedConversationList;
-            List<Conversation> previousConversationList = getSessionConversation(sessionId);
-            if (previousConversationList.size() > 5) {
-                combinedConversationList = new ArrayList<>(previousConversationList.subList(previousConversationList.size() - 5, previousConversationList.size()));
+            List<Conversation> conversationList = getSessionConversation(sessionId);
+            conversationList.add(conversation);
+            if (conversationList.size() > 20) {
+                String combinedConversationString = StringUtils.parseConversationListToString(conversationList);
+                Conversation combinedConversation = aiService.executeLLMCall(combinedConversationString, Constants.Prompts.CONVERSATION_SUMMARY_INSTRUCTION, Conversation.class);
+                cacheMap.put(Constants.CONVERSATION_CACHE_KEY, sessionId, List.of(combinedConversation));
+                return combinedConversation;
             } else {
-                combinedConversationList = new ArrayList<>(previousConversationList);
+                cacheMap.put(Constants.CONVERSATION_CACHE_KEY, sessionId, conversationList);
             }
-            combinedConversationList.add(conversation);
-            cacheMap.put(Constants.CONVERSATION_CACHE_KEY, sessionId, combinedConversationList);
         } catch (Exception e) {
             logger.error("Error in putting into cache for the session {} and the conversation {} with error {}", conversation.getSessionId(), conversation, e.getMessage());
         }
+        return null;
     }
 
     public List<Conversation> getSessionConversation(String sessionId) {

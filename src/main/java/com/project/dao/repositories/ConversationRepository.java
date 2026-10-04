@@ -9,6 +9,5 @@ import java.util.List;
 @Repository
 public interface ConversationRepository extends JpaRepository<Conversation, Long> {
 
-   List<Conversation> findTop10BySessionIdOrderByIdDesc(String sessionId);
    List<Conversation> findAllBySessionId(String sessionId);
 }
