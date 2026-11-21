@@ -37,10 +37,10 @@ public class ToolProvider {
 
         for (McpSyncClient client : mcpSyncClients) {
             try {
-                String server = client.getServerInfo().name();
-                for (McpSchema.Tool t : client.listTools().tools()) {
-                    McpSchema.Tool clean = sanitize(t);
-                    Tool tool = new Tool(clean.name(), server, firstSentence(clean.description()));
+                String serverName = client.getServerInfo().name();
+                for (McpSchema.Tool inputTool : client.listTools().tools()) {
+                    McpSchema.Tool clean = sanitize(inputTool);
+                    Tool tool = new Tool(clean.name(), serverName, firstSentence(clean.description()));
                     map.put(tool.key(), SyncMcpToolCallback.builder()
                             .mcpClient(client)
                             .tool(clean)
@@ -66,19 +66,18 @@ public class ToolProvider {
                 .toList();
     }
 
-    private static McpSchema.Tool sanitize(McpSchema.Tool t) {
-        Map<String, Object> schema = t.inputSchema();
-        if (schema == null) return t;
-
-        return McpSchema.Tool.builder()
-                .name(t.name())
-                .title(t.title())
-                .description(t.description())
-                .inputSchema(cleanMap(schema))
-                .outputSchema(t.outputSchema())
-                .annotations(t.annotations())
-                .meta(t.meta())
-                .build();
+    private static McpSchema.Tool sanitize(McpSchema.Tool tool) {
+        Map<String, Object> schema = tool.inputSchema();
+        if (schema == null) return tool;
+        return new McpSchema.Tool(
+                tool.name(),
+                tool.title(),
+                tool.description(),
+                cleanMap(schema),
+                tool.outputSchema(),
+                tool.annotations(),
+                tool.meta(),
+                tool.icons());
     }
 
     private static Map<String, Object> cleanMap(Map<String, Object> in) {
