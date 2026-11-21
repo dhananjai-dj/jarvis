@@ -4,7 +4,12 @@ import com.project.dao.entities.Conversation;
 import com.project.dao.entities.Role;
 import com.project.dto.LLMResponse;
 import com.project.dto.StepResult;
-import com.project.util.*;
+import com.project.util.Constants;
+import com.project.util.PiiMasker;
+import com.project.util.Transcriber;
+import com.project.util.StringUtils;
+import com.project.util.Synthesizer;
+import com.project.util.ToolProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
@@ -132,7 +137,7 @@ public class Orchestrator {
             }
         } catch (Exception e) {
             logger.error("Error in processing user query", e);
-            result = new LLMResponse(GENERIC_FAILURE, false, true, "");
+            result = LLMResponse.defaultResponse();
         }
         conversationService.saveConversation(sessionId, result);
         return result;
@@ -190,14 +195,14 @@ public class Orchestrator {
 
             if (tools.isEmpty()) {
                 LLMResponse chat = aiService.getResponseFromAiAgent(routerQuery, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
-                return chat.isToolCallingRequired() ? new LLMResponse(NO_TOOL_REPLY, true, true, "") : chat;
+                return chat.isToolCallingRequired() ? new LLMResponse(NO_TOOL_REPLY, true, true) : chat;
             }
 
             String executionQuery = combine(history, task + stepContext(done));
             return aiService.performToolCalling(executionQuery, tools);
         } catch (Exception e) {
             logger.error("Error in executing step [{}]", task, e);
-            return new LLMResponse(GENERIC_FAILURE, true, true, "");
+            return LLMResponse.defaultResponse();
         }
     }
 
@@ -226,7 +231,7 @@ public class Orchestrator {
         if (StringUtils.isEmpty(reply) || reply.isBlank()) {
             reply = done.stream().map(s -> s.response().result()).collect(Collectors.joining(" "));
         }
-        return new LLMResponse(reply.strip(), true, anyError, "");
+        return new LLMResponse(reply.strip(), true, anyError);
     }
 
     private String stepContext(List<StepResult> done) {
