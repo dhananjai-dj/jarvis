@@ -1,7 +1,9 @@
 package com.project.service;
 
 import com.project.dao.entities.Conversation;
+import com.project.dao.entities.Role;
 import com.project.dao.repositories.ConversationRepository;
+import com.project.dto.LLMResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -18,6 +20,11 @@ public class ConversationService {
     public ConversationService(ConversationRepository conversationRepository, CacheService cacheService) {
         this.conversationRepository = conversationRepository;
         this.cacheService = cacheService;
+    }
+
+    public void saveConversation(String sessionId, LLMResponse llmResponse){
+        Conversation conversation = Conversation.builder().isLLMSuccess(llmResponse.isError()).message(llmResponse.result()).role(Role.ASSISTANT).sessionId(sessionId).build();
+        saveConversation(conversation);
     }
 
     public void saveConversation(Conversation conversation) {

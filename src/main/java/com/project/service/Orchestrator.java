@@ -7,13 +7,14 @@ import com.project.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
-import org.springframework.ai.tool.ToolCallbackProvider;
 import org.springframework.stereotype.Service;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.StringJoiner;
+import java.util.stream.Collectors;
 
 @Service
 public class Orchestrator {
@@ -25,22 +26,20 @@ public class Orchestrator {
     private final Transcriber transcriber;
     private final Synthesizer synthesizer;
     private final CacheService cacheService;
+    private final ToolProvider toolProvider;
     private final SessionService sessionService;
-    private final SpotifyToolFilter spotifyToolFilter;
     private final ConversationService conversationService;
-    private final ToolCallbackProvider toolCallbackProvider;
     private final RecordingService recordingService;
 
 
-    public Orchestrator(Transcriber transcriber, AiService aiService, Synthesizer synthesizer, CacheService cacheService, SessionService sessionService, SpotifyToolFilter spotifyToolFilter, ConversationService conversationService, ToolCallbackProvider toolCallbackProvider, RecordingService recordingService) {
+    public Orchestrator(Transcriber transcriber, AiService aiService, Synthesizer synthesizer, CacheService cacheService, SessionService sessionService, ToolProvider toolProvider, ConversationService conversationService, RecordingService recordingService) {
         this.aiService = aiService;
         this.transcriber = transcriber;
         this.synthesizer = synthesizer;
         this.cacheService = cacheService;
         this.sessionService = sessionService;
-        this.spotifyToolFilter = spotifyToolFilter;
+        this.toolProvider = toolProvider;
         this.conversationService = conversationService;
-        this.toolCallbackProvider = toolCallbackProvider;
         this.recordingService = recordingService;
     }
 
@@ -73,12 +72,10 @@ public class Orchestrator {
             String combinedConversation = getCombinedConversation(sessionId, userQuery);
             logger.info("Complete transcript {}", combinedConversation);
 
-            LLMResponse llmOutput = processUserQuery(combinedConversation);
+            LLMResponse llmOutput = processUserQuery(sessionId, combinedConversation);
             String botReply = llmOutput.result();
             logger.info("Output from ml: {}", llmOutput);
 
-            Conversation assistantConversation = Conversation.builder().isLLMSuccess(llmOutput.isError()).message(botReply).role(Role.ASSISTANT).sessionId(sessionId).filePath(filePath + Constants.OUTPUT_RECORDING_FILE_NAME).build();
-            conversationService.saveConversation(assistantConversation);
             botReply = PiiMasker.unMaskValue(botReply);
 
             stopWaitingThread(waitingThread);
@@ -117,7 +114,6 @@ public class Orchestrator {
         }
     }
 
-    /* Helper Methods */
     private void stopWaitingThread(Thread waitingThread) {
         try {
             if (waitingThread != null) {
@@ -161,29 +157,7 @@ public class Orchestrator {
         return previousConversation;
     }
 
-    private LLMResponse processUserQuery(String finalQuery) {
-        try {
-            LLMResponse llmResponse = aiService.getResponseFromAiAgent(finalQuery, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
-            if (llmResponse.isError() || !llmResponse.isToolCallingRequired()) {
-                return llmResponse;
-            }
-            LLMResponse toolCallResponse = aiService.getResponseFromAiAgent(finalQuery, Constants.Prompts.SPOTIFY_TOOL_IDENTIFIER);
-            if (toolCallResponse.isError() || !toolCallResponse.isToolCallingRequired()) {
-                return toolCallResponse;
-            }
-            List<ToolCallback> tools = spotifyToolFilter.getPlayRequestTools(toolCallbackProvider, toolCallResponse);
-            if (!tools.isEmpty()) {
-                LLMResponse toolCallingResponse = aiService.performToolCalling(finalQuery, tools);
-                logger.info("Tool calling response {}", toolCallingResponse);
-                return toolCallingResponse;
-            }
-        } catch (Exception e) {
-            logger.error("Error in processing User query {}", e.getMessage());
-        }
-        return LLMResponse.defaultResponse();
-    }
-
-    public String getSessionSummary(String sessionId) {
+    private String getSessionSummary(String sessionId) {
         String result = "Unable to save session";
         try {
             List<Conversation> conversationList = conversationService.getAllConversationOfTheSession(sessionId);
@@ -195,5 +169,73 @@ public class Orchestrator {
             logger.error("Error in generating summary for the session with session Id {}", sessionId);
         }
         return result;
+    }
+
+
+    private LLMResponse processUserQuery(String sessionId, String query) {
+        LLMResponse llmResponse = null;
+        try {
+            llmResponse = aiService.getResponseFromAiAgent(query, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
+            if (StringUtils.isEmpty(llmResponse.nextPrompt())) {
+                conversationService.saveConversation(sessionId, llmResponse);
+                return llmResponse;
+            }
+            return processUserQuery(sessionId, query, llmResponse.nextPrompt(), llmResponse.isToolCallingRequired());
+        } catch (Exception e) {
+            logger.error("Error in processing user query {}", e.getMessage());
+        }
+        return llmResponse;
+    }
+
+    private LLMResponse processUserQuery(String sessionId, String query, String prompt, boolean isToolCallingRequired) {
+        LLMResponse llmResponse = null;
+        try {
+            if (isToolCallingRequired) {
+                List<ToolCallback> tools = getToolsToPerformAction(query);
+                llmResponse = aiService.performToolCalling(prompt, tools);
+                conversationService.saveConversation(sessionId, llmResponse);
+                return llmResponse;
+            } else {
+                llmResponse = aiService.getResponseFromAiAgent(query, prompt);
+            }
+            conversationService.saveConversation(sessionId, llmResponse);
+            if (llmResponse.isToolCallingRequired() || !StringUtils.isEmpty(llmResponse.nextPrompt())) {
+                return processUserQuery(sessionId, query, llmResponse.nextPrompt(), llmResponse.isToolCallingRequired());
+            }
+        } catch (Exception e) {
+            logger.error("Error in Processing User Query {}", e.getMessage());
+        }
+        return llmResponse;
+    }
+
+    private List<ToolCallback> getToolsToPerformAction(String query) {
+        try {
+            String catalog = toolProvider.getTools().stream()
+                    .map(t -> t.key() + ": " + t.description())
+                    .collect(Collectors.joining("\n"));
+            String toolKeyString = aiService.executeLLMCall(query, Constants.Prompts.TOOL_IDENTIFIER.formatted(catalog), String.class);
+            List<String> toolKeys = Arrays.stream(toolKeyString.split(",")).map(String::strip).toList();
+            return toolProvider.getToolCallBack(toolKeys);
+        } catch (Exception e) {
+            logger.error("Error in identifying tool to perform action {}", e.getMessage());
+        }
+        return List.of();
+    }
+
+    public void processText(String userQuery) throws Exception{
+        Conversation userConversation = Conversation.builder().isLLMSuccess(false).message(userQuery).role(Role.USER).sessionId("TextSession").filePath("filePath" + Constants.INPUT_RECORDING_FILE_NAME).build();
+        conversationService.saveConversation(userConversation);
+
+        String combinedConversation = getCombinedConversation("TextSession", userQuery);
+
+        LLMResponse llmOutput = processUserQuery("TextSession", combinedConversation);
+        String botReply = llmOutput.result();
+        logger.info("Output from ml: {}", llmOutput);
+
+        botReply = PiiMasker.unMaskValue(botReply);
+        if (!llmOutput.isToolCallingRequired() || llmOutput.isError()) {
+            File outputFile = synthesizer.synthesize(botReply, "filePath");
+            synthesizer.speak(outputFile);
+        }
     }
 }

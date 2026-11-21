@@ -1,7 +1,9 @@
 package com.project.controller;
 
 import com.project.service.AiService;
+import com.project.service.Orchestrator;
 import com.project.util.Synthesizer;
+import com.project.util.ToolProvider;
 import com.project.util.Transcriber;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.ai.tool.ToolCallbackProvider;
@@ -25,6 +27,10 @@ public class Miscellaneous {
     AiService aiService;
     @Autowired
     ToolCallbackProvider provider;
+    @Autowired
+    ToolProvider toolFilter;
+    @Autowired
+    Orchestrator orchestrator;
 
 
     @GetMapping("/stt")
@@ -47,4 +53,16 @@ public class Miscellaneous {
                 .toList();
         return aiService.performToolCalling(query, list).result();
     }
+
+    @GetMapping("/list/tool")
+        public List<?> toolsList(){
+        return toolFilter.getTools();
+    }
+
+    @PostMapping("/reply")
+    public void reply(@RequestBody String userQuery) throws  Exception{
+        orchestrator.processText(userQuery);
+    }
+
+
 }

@@ -7,7 +7,6 @@ import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.prompt.ChatOptions;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
@@ -48,7 +47,7 @@ public class AiService {
         } catch (Exception e) {
             logger.error("Error in getting LLM Response from Secondary Agent{}", e.getMessage());
         }
-        return new LLMResponse("Error in generating summary", false, true);
+        return LLMResponse.defaultResponse();
     }
 
     public LLMResponse performToolCalling(String query, List<ToolCallback> tools) {
@@ -63,7 +62,14 @@ public class AiService {
     }
 
     public <T> T executeLLMCall(String query, String prompt, Class<T> returnType) {
-        return executeLLMCall(primaryAgent, query, prompt, null, returnType);
+        try {
+            if (rateLimiter.consume(query)) {
+                return executeLLMCall(primaryAgent, query, prompt, null, returnType);
+            }
+        } catch (Exception e) {
+            logger.error("Error in executing LLM call {}", e.getMessage());
+        }
+        return null;
     }
 
     public <T> T executeLLMCall(ChatClient chatClient, String query, String prompt, Class<T> returnType) {

@@ -8,6 +8,15 @@ spring:
               command: node
               args:
                 - /Users/dhananjai_dj/dev/spotify-mcp-server/build/index.js
+            telegram:
+              command: /Users/dhananjai_dj/.local/bin/mcp-telegram
+              args:
+                - "start"
+              env:
+                API_ID: ${TELEGRAM_API_ID}
+                API_HASH: ${TELEGRAM_API_HASH}
+
+
     openai:
       base-url: https://api.groq.com/openai/v1
       api-key: ${GROQ_API_KEY}
