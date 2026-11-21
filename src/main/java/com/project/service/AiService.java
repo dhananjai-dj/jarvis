@@ -32,9 +32,7 @@ public class AiService {
     @CircuitBreaker(name = "aiService", fallbackMethod = "getResponseFromSecondaryAiAgent")
     public LLMResponse getResponseFromAiAgent(String query, String prompt) {
         try {
-            if (rateLimiter.consume(query)) {
-                return executeLLMCall(primaryAgent, query, prompt, LLMResponse.class);
-            }
+            return executeLLMCall(primaryAgent, query, prompt, LLMResponse.class);
         } catch (Exception e) {
             logger.error("Error in getting LLM Response from Primary Agent{}", e.getMessage());
         }
@@ -52,9 +50,7 @@ public class AiService {
 
     public LLMResponse performToolCalling(String query, List<ToolCallback> tools) {
         try {
-            if (rateLimiter.consume(query)) {
-                return executeLLMCall(primaryAgent, query, Constants.Prompts.TOOL_EXECUTION_SYSTEM_INSTRUCTION, tools, LLMResponse.class);
-            }
+            return executeLLMCall(primaryAgent, query, Constants.Prompts.TOOL_EXECUTION_SYSTEM_INSTRUCTION, tools, LLMResponse.class);
         } catch (Exception e) {
             logger.info("Error in performing tool calling {}", e.getMessage());
         }
@@ -63,9 +59,7 @@ public class AiService {
 
     public <T> T executeLLMCall(String query, String prompt, Class<T> returnType) {
         try {
-            if (rateLimiter.consume(query)) {
-                return executeLLMCall(primaryAgent, query, prompt, null, returnType);
-            }
+            return executeLLMCall(primaryAgent, query, prompt, null, returnType);
         } catch (Exception e) {
             logger.error("Error in executing LLM call {}", e.getMessage());
         }
@@ -78,6 +72,9 @@ public class AiService {
 
 
     public <T> T executeLLMCall(ChatClient chatClient, String query, String prompt, List<ToolCallback> tools, Class<T> returnType) {
+        if(!rateLimiter.consume(query + prompt)){
+            return null;
+        }
         var promptSpec = chatClient.prompt()
                 .system(prompt)
                 .user(query);

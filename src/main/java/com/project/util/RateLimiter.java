@@ -21,14 +21,14 @@ public class RateLimiter {
     private final Encoding encoding = encodingRegistry.getEncoding(EncodingType.CL100K_BASE);
     private final Bucket requestBucket = Bucket.builder()
             .addLimit(BandwidthBuilder.builder()
-                    .capacity(30)
-                    .refillGreedy(30, Duration.ofMinutes(1))
+                    .capacity(15)
+                    .refillGreedy(15, Duration.ofMinutes(1))
                     .build())
             .build();
 
     private final Bucket tokenBucket = Bucket.builder()
-            .addLimit(BandwidthBuilder.builder().capacity(30000)
-                    .refillGreedy(30000, Duration.ofMinutes(1))
+            .addLimit(BandwidthBuilder.builder().capacity(250000)
+                    .refillGreedy(250000, Duration.ofMinutes(1))
                     .build())
             .build();
 
