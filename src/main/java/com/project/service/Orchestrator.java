@@ -121,6 +121,7 @@ public class Orchestrator {
     private LLMResponse handleUserQuery(String sessionId, String userQuery) {
         String history = getHistoryBlock(sessionId);
         String combined = combine(history, userQuery);
+        logger.info("Combined user query {}", combined);
         LLMResponse result;
         try {
             LLMResponse first = aiService.getResponseFromAiAgent(combined, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
