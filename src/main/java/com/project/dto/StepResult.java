@@ -1,4 +1,4 @@
 package com.project.dto;
 
-public record StepResponse() {
-}
+public record StepResult(String task, LLMResponse response) {}
+

@@ -3,25 +3,35 @@ package com.project.service;
 import com.project.dao.entities.Conversation;
 import com.project.dao.entities.Role;
 import com.project.dto.LLMResponse;
+import com.project.dto.StepResult;
 import com.project.util.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 
-import javax.xml.namespace.QName;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.StringJoiner;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
 public class Orchestrator {
     private static final Logger logger = LoggerFactory.getLogger(Orchestrator.class);
-    private final File errorMessageFile = new File("error_message.wav");
 
+    private static final int MAX_STEPS = 5;
+
+    private static final Pattern COMPOUND_HINT =
+            Pattern.compile("(?i)\\b(and|then|also|plus|after that|afterwards|as well)\\b|[,;]");
+
+    private static final String GENERIC_FAILURE =
+            "I'm afraid something has gone awry, sir. Might you try that once more?";
+    private static final String NO_TOOL_REPLY =
+            "I'm afraid I have no means of doing that just yet, sir.";
+
+    private final File errorMessageFile = new File("error_message.wav");
 
     private final AiService aiService;
     private final Transcriber transcriber;
@@ -67,17 +77,12 @@ public class Orchestrator {
                 sessionService.createSession(sessionId, userQuery);
             }
 
-            Conversation userConversation = Conversation.builder().isLLMSuccess(false).message(userQuery).role(Role.USER).sessionId(sessionId).filePath(filePath + Constants.INPUT_RECORDING_FILE_NAME).build();
-            conversationService.saveConversation(userConversation);
+            saveUserConversation(sessionId, userQuery, filePath + Constants.INPUT_RECORDING_FILE_NAME);
 
-            String combinedConversation = getCombinedConversation(sessionId, userQuery);
-            logger.info("Complete transcript {}", combinedConversation);
-
-            LLMResponse llmOutput = processUserQuery(sessionId, combinedConversation);
-            String botReply = llmOutput.result();
+            LLMResponse llmOutput = handleUserQuery(sessionId, userQuery);
             logger.info("Output from ml: {}", llmOutput);
 
-            botReply = PiiMasker.unMaskValue(botReply);
+            String botReply = PiiMasker.unMaskValue(llmOutput.result());
 
             stopWaitingThread(waitingThread);
 
@@ -86,7 +91,7 @@ public class Orchestrator {
         } catch (Exception e) {
             stopWaitingThread(waitingThread);
             synthesizer.speak(errorMessageFile);
-            logger.error("Error in responding {}", e.getMessage());
+            logger.error("Error in responding", e);
         }
     }
 
@@ -109,36 +114,177 @@ public class Orchestrator {
             String summary = getSessionSummary(sessionId);
             sessionService.saveSessionSummary(sessionId, summary);
         } catch (Exception e) {
-            logger.error("Error in saving the summary {}", e.getMessage());
+            logger.error("Error in saving the summary", e);
         }
     }
 
-    private void stopWaitingThread(Thread waitingThread) {
+    private LLMResponse handleUserQuery(String sessionId, String userQuery) {
+        String history = getHistoryBlock(sessionId);
+        String combined = combine(history, userQuery);
+        LLMResponse result;
         try {
-            if (waitingThread != null) {
-                if (waitingThread.isAlive()) {
-                    waitingThread.interrupt();
-                }
-                synthesizer.stopSpeaking();
+            LLMResponse first = aiService.getResponseFromAiAgent(combined, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
+            if (!first.isToolCallingRequired()) {
+                result = first;
+            } else {
+                result = runActionPlan(history, userQuery, combined);
             }
         } catch (Exception e) {
+            logger.error("Error in processing user query", e);
+            result = new LLMResponse(GENERIC_FAILURE, false, true, "");
+        }
+        conversationService.saveConversation(sessionId, result);
+        return result;
+    }
 
-            logger.info("Error in stoping waiting thread {}", e.getMessage());
+    private LLMResponse runActionPlan(String history, String userQuery, String combined) {
+        List<String> tasks = planTasks(combined, userQuery);
+        logger.info("Action plan has {} step(s): {}", tasks.size(), tasks);
+
+        List<StepResult> done = new ArrayList<>();
+        for (int i = 0; i < tasks.size(); i++) {
+            String task = tasks.get(i);
+            LLMResponse response = executeStep(history, task, done);
+            done.add(new StepResult(task, response));
+            logger.info("Step {}/{} [{}] -> {}", i + 1, tasks.size(), task, response);
+            if (response.isError()) {
+                break;
+            }
+        }
+        return composeReply(userQuery, tasks, done);
+    }
+
+    private List<String> planTasks(String combined, String userQuery) {
+        if (!COMPOUND_HINT.matcher(userQuery).find()) {
+            return List.of(userQuery);
+        }
+        try {
+            String raw = aiService.executeLLMCall(combined, Constants.Prompts.TASK_PLANNER, String.class);
+            List<String> tasks = new ArrayList<>();
+            if (raw != null) {
+                for (String line : raw.split("\\R")) {
+                    String task = line.strip().replaceFirst("^(?:[-*]|\\d+[.)])\\s*", "");
+                    if (!task.isBlank()) {
+                        tasks.add(task);
+                    }
+                }
+            }
+            if (tasks.size() > MAX_STEPS) {
+                logger.warn("Planner returned {} tasks, keeping the first {}", tasks.size(), MAX_STEPS);
+                tasks = new ArrayList<>(tasks.subList(0, MAX_STEPS));
+            }
+            if (!tasks.isEmpty()) {
+                return tasks;
+            }
+        } catch (Exception e) {
+            logger.error("Error in planning tasks, falling back to a single step", e);
+        }
+        return List.of(userQuery);
+    }
+
+    private LLMResponse executeStep(String history, String task, List<StepResult> done) {
+        try {
+            String routerQuery = combine(history, task);
+            List<ToolCallback> tools = getToolsToPerformAction(routerQuery);
+
+            if (tools.isEmpty()) {
+                LLMResponse chat = aiService.getResponseFromAiAgent(routerQuery, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
+                return chat.isToolCallingRequired() ? new LLMResponse(NO_TOOL_REPLY, true, true, "") : chat;
+            }
+
+            String executionQuery = combine(history, task + stepContext(done));
+            return aiService.performToolCalling(executionQuery, tools);
+        } catch (Exception e) {
+            logger.error("Error in executing step [{}]", task, e);
+            return new LLMResponse(GENERIC_FAILURE, true, true, "");
         }
     }
 
-    private String getCombinedConversation(String sessionId, String query) {
-        try {
-            StringJoiner stringJoiner = new StringJoiner("\n");
-            stringJoiner.add("Previous Conversion History:[");
-            List<Conversation> previousConversations = getPreviousConversation(sessionId);
-            stringJoiner.add(StringUtils.parseConversationListToString(previousConversations));
-            stringJoiner.add("]\n Current User message \n" + query);
-            return stringJoiner.toString();
-        } catch (Exception e) {
-            logger.error("Error in getting previous conversation from cache {}", e.getMessage());
+    private LLMResponse composeReply(String userQuery, List<String> tasks, List<StepResult> done) {
+        if (tasks.size() == 1) {
+            return done.getFirst().response();
         }
-        return query;
+        boolean anyError = done.stream().anyMatch(s -> s.response().isError());
+        String reply = null;
+        try {
+            StringBuilder input = new StringBuilder("User request: ").append(userQuery).append("\nStep results:\n");
+            for (int i = 0; i < tasks.size(); i++) {
+                input.append(i + 1).append(". Task: ").append(tasks.get(i)).append('\n');
+                if (i < done.size()) {
+                    LLMResponse r = done.get(i).response();
+                    input.append("   Status: ").append(r.isError() ? "FAILED OR NEEDS INPUT" : "DONE").append('\n');
+                    input.append("   Report: ").append(r.result()).append('\n');
+                } else {
+                    input.append("   Status: NOT ATTEMPTED\n");
+                }
+            }
+            reply = aiService.executeLLMCall(input.toString(), Constants.Prompts.REPLY_COMPOSER, String.class);
+        } catch (Exception e) {
+            logger.error("Error in composing the final reply", e);
+        }
+        if (StringUtils.isEmpty(reply) || reply.isBlank()) {
+            reply = done.stream().map(s -> s.response().result()).collect(Collectors.joining(" "));
+        }
+        return new LLMResponse(reply.strip(), true, anyError, "");
+    }
+
+    private String stepContext(List<StepResult> done) {
+        if (done.isEmpty()) {
+            return "";
+        }
+        StringBuilder sb = new StringBuilder("\n(Already completed earlier in this same request, for reference only, do not repeat:");
+        for (int i = 0; i < done.size(); i++) {
+            sb.append(' ').append(i + 1).append(") ").append(done.get(i).response().result());
+        }
+        return sb.append(')').toString();
+    }
+
+    private List<ToolCallback> getToolsToPerformAction(String query) {
+        try {
+            String catalog = toolProvider.getTools().stream()
+                    .map(t -> t.key() + ": " + t.description())
+                    .collect(Collectors.joining("\n"));
+            String toolKeyString = aiService.executeLLMCall(query, Constants.Prompts.TOOL_IDENTIFIER.formatted(catalog), String.class);
+            List<String> toolKeys = Arrays.stream(toolKeyString.split(","))
+                    .map(String::strip)
+                    .filter(k -> !k.isEmpty())
+                    .distinct()
+                    .toList();
+            return toolProvider.getToolCallBack(toolKeys);
+        } catch (Exception e) {
+            logger.error("Error in identifying tool to perform action", e);
+        }
+        return List.of();
+    }
+
+    private void saveUserConversation(String sessionId, String userQuery, String filePath) {
+        Conversation userConversation = Conversation.builder()
+                .isLLMSuccess(false)
+                .message(userQuery)
+                .role(Role.USER)
+                .sessionId(sessionId)
+                .filePath(filePath)
+                .build();
+        conversationService.saveConversation(userConversation);
+    }
+
+    private String getHistoryBlock(String sessionId) {
+        try {
+            List<Conversation> previousConversations = getPreviousConversation(sessionId);
+            return "Previous Conversion History:[\n"
+                    + StringUtils.parseConversationListToString(previousConversations)
+                    + "\n]";
+        } catch (Exception e) {
+            logger.error("Error in getting previous conversation from cache", e);
+            return "";
+        }
+    }
+
+    private String combine(String historyBlock, String currentMessage) {
+        if (historyBlock == null || historyBlock.isEmpty()) {
+            return currentMessage;
+        }
+        return historyBlock + "\n Current User message \n" + currentMessage;
     }
 
     private List<Conversation> getPreviousConversation(String sessionId) {
@@ -151,7 +297,7 @@ public class Orchestrator {
             }
             return previousConversation;
         } catch (Exception e) {
-            logger.error("Error in fetching the previous conversation");
+            logger.error("Error in fetching the previous conversation", e);
         }
         return previousConversation;
     }
@@ -165,76 +311,21 @@ public class Orchestrator {
                 result = aiService.executeLLMCall(combinedConversationString, Constants.Prompts.SESSION_SUMMARY_INSTRUCTION, String.class);
             }
         } catch (Exception e) {
-            logger.error("Error in generating summary for the session with session Id {}", sessionId);
+            logger.error("Error in generating summary for the session with session Id {}", sessionId, e);
         }
         return result;
     }
 
-
-    private LLMResponse processUserQuery(String sessionId, String query) {
-        LLMResponse llmResponse = null;
+    private void stopWaitingThread(Thread waitingThread) {
         try {
-            llmResponse = aiService.getResponseFromAiAgent(query, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
-            if (StringUtils.isEmpty(llmResponse.nextPrompt()) && !llmResponse.isToolCallingRequired()) {
-                conversationService.saveConversation(sessionId, llmResponse);
-                return llmResponse;
-            }
-            return processUserQuery(sessionId, query, llmResponse.nextPrompt(), llmResponse.isToolCallingRequired());
-        } catch (Exception e) {
-            logger.error("Error in processing user query {}", e.getMessage());
-        }
-        return llmResponse;
-    }
-
-    private LLMResponse processUserQuery(String sessionId, String query, String prompt, boolean isToolCallingRequired) {
-        LLMResponse llmResponse = null;
-        try {
-            if (isToolCallingRequired) {
-                List<ToolCallback> tools = getToolsToPerformAction(query);
-                llmResponse = aiService.performToolCalling(query, tools);
-                conversationService.saveConversation(sessionId, llmResponse);
-                return llmResponse;
-            } else {
-                llmResponse = aiService.getResponseFromAiAgent(query, prompt);
-            }
-            conversationService.saveConversation(sessionId, llmResponse);
-            if (llmResponse.isToolCallingRequired() || !StringUtils.isEmpty(llmResponse.nextPrompt())) {
-                return processUserQuery(sessionId, query, llmResponse.nextPrompt(), llmResponse.isToolCallingRequired());
+            if (waitingThread != null) {
+                if (waitingThread.isAlive()) {
+                    waitingThread.interrupt();
+                }
+                synthesizer.stopSpeaking();
             }
         } catch (Exception e) {
-            logger.error("Error in Processing User Query {}", e.getMessage());
-        }
-        return llmResponse;
-    }
-
-    private List<ToolCallback> getToolsToPerformAction(String query) {
-        try {
-            String catalog = toolProvider.getTools().stream()
-                    .map(t -> t.key() + ": " + t.description())
-                    .collect(Collectors.joining("\n"));
-            String toolKeyString = aiService.executeLLMCall(query, Constants.Prompts.TOOL_IDENTIFIER.formatted(catalog), String.class);
-            List<String> toolKeys = Arrays.stream(toolKeyString.split(",")).map(String::strip).toList();
-            return toolProvider.getToolCallBack(toolKeys);
-        } catch (Exception e) {
-            logger.error("Error in identifying tool to perform action {}", e.getMessage());
-        }
-        return List.of();
-    }
-
-    public void processText(String userQuery) throws Exception{
-        Conversation userConversation = Conversation.builder().isLLMSuccess(false).message(userQuery).role(Role.USER).sessionId("TextSession").filePath("filePath" + Constants.INPUT_RECORDING_FILE_NAME).build();
-        conversationService.saveConversation(userConversation);
-
-        String combinedConversation = getCombinedConversation("TextSession", userQuery);
-
-        LLMResponse llmOutput = processUserQuery("TextSession", combinedConversation);
-        String botReply = llmOutput.result();
-        logger.info("Output from ml: {}", llmOutput);
-
-        botReply = PiiMasker.unMaskValue(botReply);
-        if (!llmOutput.isToolCallingRequired() || llmOutput.isError()) {
-            File outputFile = synthesizer.synthesize(botReply, "filePath");
-            synthesizer.speak(outputFile);
+            logger.info("Error in stopping waiting thread {}", e.getMessage());
         }
     }
 }

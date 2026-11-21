@@ -59,10 +59,5 @@ public class Miscellaneous {
         return toolFilter.getTools();
     }
 
-    @PostMapping("/reply")
-    public void reply(@RequestBody String userQuery) throws  Exception{
-        orchestrator.processText(userQuery);
-    }
-
 
 }

@@ -21,6 +21,12 @@ spring:
               env:
                 API_ID: ${TELEGRAM_API_ID}
                 API_HASH: ${TELEGRAM_API_HASH}
+            zepto:
+              command: npx
+              args: [ "-y", "mcp-remote", "https://mcp.zepto.co.in/mcp" ]
+              env:
+                PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+                HOME: /Users/dhananjai_dj
     google:
       genai:
         api-key: ${GEMINI_API_KEY}
@@ -43,8 +49,8 @@ spring:
       port: 6379
   datasource:
     url: jdbc:postgresql://localhost:5432/jarvis
-    username: jarvis
-    password: IamIronMan
+    username: ${JARIVS_DB_USER_NAME}
+    password: ${JARVIS_DB_PASSWORD}
   jpa:
     hibernate:
       ddl-auto: update
