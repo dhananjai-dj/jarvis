@@ -9,6 +9,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 
+import javax.xml.namespace.QName;
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -190,7 +191,7 @@ public class Orchestrator {
         try {
             if (isToolCallingRequired) {
                 List<ToolCallback> tools = getToolsToPerformAction(query);
-                llmResponse = aiService.performToolCalling(prompt, tools);
+                llmResponse = aiService.performToolCalling(query, tools);
                 conversationService.saveConversation(sessionId, llmResponse);
                 return llmResponse;
             } else {
