@@ -31,8 +31,6 @@ public class Orchestrator {
     private static final Pattern COMPOUND_HINT =
             Pattern.compile("(?i)\\b(and|then|also|plus|after that|afterwards|as well)\\b|[,;]");
 
-    private static final String GENERIC_FAILURE =
-            "I'm afraid something has gone awry, sir. Might you try that once more?";
     private static final String NO_TOOL_REPLY =
             "I'm afraid I have no means of doing that just yet, sir.";
 
