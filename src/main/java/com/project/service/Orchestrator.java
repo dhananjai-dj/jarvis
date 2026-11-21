@@ -80,10 +80,8 @@ public class Orchestrator {
 
             stopWaitingThread(waitingThread);
 
-            if (!llmOutput.isToolCallingRequired() || llmOutput.isError()) {
-                File outputFile = synthesizer.synthesize(botReply, filePath);
-                synthesizer.speak(outputFile);
-            }
+            File outputFile = synthesizer.synthesize(botReply, filePath);
+            synthesizer.speak(outputFile);
         } catch (Exception e) {
             stopWaitingThread(waitingThread);
             synthesizer.speak(errorMessageFile);
@@ -176,7 +174,7 @@ public class Orchestrator {
         LLMResponse llmResponse = null;
         try {
             llmResponse = aiService.getResponseFromAiAgent(query, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
-            if (StringUtils.isEmpty(llmResponse.nextPrompt())) {
+            if (StringUtils.isEmpty(llmResponse.nextPrompt()) && !llmResponse.isToolCallingRequired()) {
                 conversationService.saveConversation(sessionId, llmResponse);
                 return llmResponse;
             }

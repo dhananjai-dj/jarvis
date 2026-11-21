@@ -4,6 +4,12 @@ spring:
       client:
         stdio:
           connections:
+            google-calendar:
+              command: /opt/homebrew/bin/google-calendar-mcp
+              env:
+                GOOGLE_OAUTH_CREDENTIALS: ${GOOGLE_OAUTH_CREDENTIALS}
+                HOME: /Users/dhananjai_dj
+                PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
             spotify:
               command: node
               args:
@@ -15,7 +21,12 @@ spring:
               env:
                 API_ID: ${TELEGRAM_API_ID}
                 API_HASH: ${TELEGRAM_API_HASH}
-
+    google:
+      genai:
+        api-key: ${GEMINI_API_KEY}
+        chat:
+          options:
+            model: gemini-3.5-flash-lite
 
     openai:
       base-url: https://api.groq.com/openai/v1
@@ -51,3 +62,8 @@ resilience4j:
         failure-rate-threshold: 50
         wait-duration-in-open-state: 120s
         permitted-number-of-calls-in-half-open-state: 5
+
+logging:
+  level:
+    root: INFO
+    io.modelcontextprotocol: DEBUG

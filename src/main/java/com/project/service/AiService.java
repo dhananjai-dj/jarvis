@@ -23,10 +23,10 @@ public class AiService {
     private final RateLimiter rateLimiter;
 
 
-    public AiService(@Qualifier("secondaryAgent") ChatClient secondaryAgent, @Qualifier("primaryAgent") ChatClient primaryAgent, RateLimiter rateLimiter) {
-        this.secondaryAgent = secondaryAgent;
-        this.primaryAgent = primaryAgent;
+    public AiService(RateLimiter rateLimiter, @Qualifier("primaryAgent") ChatClient primaryAgent, @Qualifier("secondaryAgent") ChatClient secondaryAgent) {
         this.rateLimiter = rateLimiter;
+        this.primaryAgent = primaryAgent;
+        this.secondaryAgent = secondaryAgent;
     }
 
     @CircuitBreaker(name = "aiService", fallbackMethod = "getResponseFromSecondaryAiAgent")
