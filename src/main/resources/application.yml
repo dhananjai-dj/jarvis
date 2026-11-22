@@ -4,12 +4,18 @@ spring:
       client:
         stdio:
           connections:
-            google-calendar:
-              command: /opt/homebrew/bin/google-calendar-mcp
+            gmail:
+              command: npx
+              args: [ "-y", "@gongrzhe/server-gmail-autoauth-mcp" ]
               env:
-                GOOGLE_OAUTH_CREDENTIALS: ${GOOGLE_OAUTH_CREDENTIALS}
-                HOME: /Users/dhananjai_dj
                 PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+                HOME: /Users/dhananjai_dj
+            google-calendar:
+              command:  npx
+              args: ["-y", "@gongrzhe/server-gmail-autoauth-mcp"]
+              env:
+                PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
+                HOME: /Users/dhananjai_dj
             spotify:
               command: node
               args:
