@@ -18,15 +18,12 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.regex.Pattern;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 public class Orchestrator {
     private static final Logger logger = LoggerFactory.getLogger(Orchestrator.class);
-
-    private static final Pattern COMPOUND_HINT =
-            Pattern.compile("(?i)\\b(and|then|also|plus|after that|afterwards|as well)\\b|[,;]");
 
     private static final String NO_TOOL_REPLY =
             "I'm afraid I have no means of doing that just yet, sir.";
@@ -139,7 +136,7 @@ public class Orchestrator {
     }
 
     private LLMResponse runActionPlan(String history, String userQuery, String combined) {
-        TaskList taskList =  planTasks(combined, userQuery);
+        TaskList taskList = planTasks(combined, userQuery);
         List<Task> tasks = taskList.tasks();
         logger.info("Action plan has {} step(s): {}", tasks.size(), tasks);
 
@@ -157,21 +154,19 @@ public class Orchestrator {
     }
 
     private TaskList planTasks(String combined, String userQuery) {
-        if (!COMPOUND_HINT.matcher(userQuery).find()) {
-            return TaskList.getSingleTask(userQuery);
-        }
         try {
-            return aiService.executeLLMCall(combined, Constants.Prompts.TASK_PLANNER, TaskList.class);
+            Set<String> serverName = toolProvider.getTools().keySet();
+            return aiService.executeLLMCall(combined, Constants.Prompts.TASK_PLANNER.formatted(serverName), TaskList.class);
         } catch (Exception e) {
             logger.error("Error in planning tasks, falling back to a single step", e);
         }
         return TaskList.getSingleTask(userQuery);
     }
 
-    private LLMResponse executeStep(String history, String task, List<StepResult> done, String serverName) {
+    private LLMResponse executeStep(String history, String task, List<StepResult> done, String mcpName) {
         try {
             String routerQuery = combine(history, task);
-            List<ToolCallback> tools = getToolsToPerformAction(routerQuery, serverName);
+            List<ToolCallback> tools = getToolsToPerformAction(routerQuery, mcpName);
 
             if (tools.isEmpty()) {
                 LLMResponse chat = aiService.getResponseFromAiAgent(routerQuery, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
@@ -179,7 +174,9 @@ public class Orchestrator {
             }
 
             String executionQuery = combine(history, task + stepContext(done));
-            return aiService.performToolCalling(executionQuery, tools);
+            ToolRunResult toolRunResult = aiService.performToolCalling(executionQuery, tools);
+            logger.info("Tool result {}", toolRunResult);
+            return new LLMResponse(toolRunResult.finalText(), true, toolRunResult.isFailed());
         } catch (Exception e) {
             logger.error("Error in executing step [{}]", task, e);
             return LLMResponse.defaultResponse();
@@ -225,12 +222,16 @@ public class Orchestrator {
         return sb.append(')').toString();
     }
 
-    private List<ToolCallback> getToolsToPerformAction(String query, String serverName) {
+    private List<ToolCallback> getToolsToPerformAction(String query, String mcpName) {
         try {
-            String catalog = toolProvider.getTools(serverName).stream()
+            if (StringUtils.isEmpty(mcpName) || "NONE".equalsIgnoreCase(mcpName)) {
+                return List.of();
+            }
+            String catalog = toolProvider.getTools(mcpName).stream()
                     .map(tool -> tool.name() + ": " + tool.description())
                     .collect(Collectors.joining("\n"));
             ToolIdentifier toolIdentifier = aiService.executeLLMCall(query, Constants.Prompts.TOOL_IDENTIFIER.formatted(catalog), ToolIdentifier.class);
+            logger.info("Tool Identifier response {}", toolIdentifier);
             List<String> toolKeys = Arrays.stream(toolIdentifier.toolList().split(","))
                     .map(String::strip)
                     .filter(k -> !k.isEmpty())

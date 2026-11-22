@@ -1,6 +1,7 @@
 package com.project.service;
 
 import com.project.dto.LLMResponse;
+import com.project.dto.ToolRunResult;
 import com.project.util.Constants;
 import com.project.util.RateLimiter;
 import io.github.resilience4j.circuitbreaker.annotation.CircuitBreaker;
@@ -48,13 +49,13 @@ public class AiService {
         return LLMResponse.defaultResponse();
     }
 
-    public LLMResponse performToolCalling(String query, List<ToolCallback> tools) {
+    public ToolRunResult performToolCalling(String query, List<ToolCallback> tools) {
         try {
-            return executeLLMCall(primaryAgent, query, Constants.Prompts.TOOL_EXECUTION_SYSTEM_INSTRUCTION, tools, LLMResponse.class);
+            return executeLLMCall(primaryAgent, query, Constants.Prompts.TOOL_EXECUTION_SYSTEM_INSTRUCTION, tools, ToolRunResult.class);
         } catch (Exception e) {
             logger.info("Error in performing tool calling {}", e.getMessage());
         }
-        return LLMResponse.defaultResponse();
+        return new ToolRunResult("Error in performing tool calling", true, true);
     }
 
     public <T> T executeLLMCall(String query, String prompt, Class<T> returnType) {

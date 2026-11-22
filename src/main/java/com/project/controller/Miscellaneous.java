@@ -52,7 +52,7 @@ public class Miscellaneous {
         List<ToolCallback> list = Arrays.stream(provider.getToolCallbacks())
                 .filter(tc -> wanted.contains(tc.getToolDefinition().name()))
                 .toList();
-        return aiService.performToolCalling(query, list).result();
+        return aiService.performToolCalling(query, list).finalText();
     }
 
     @GetMapping("/list/tool")
