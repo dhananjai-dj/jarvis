@@ -52,7 +52,7 @@ public class Synthesizer {
 
     public File synthesizes(String text, String filePath) {
         try {
-            Path targetPath = Path.of(filePath, "");
+            Path targetPath = Path.of(filePath, Constants.OUTPUT_RECORDING_FILE_NAME);
             if (targetPath.getParent() != null) {
                 Files.createDirectories(targetPath.getParent());
             }
