@@ -2,6 +2,8 @@ spring:
   ai:
     mcp:
       client:
+        enabled: true
+        type: SYNC
         stdio:
           connections:
             gmail:
@@ -12,7 +14,7 @@ spring:
                 HOME: /Users/dhananjai_dj
             google-calendar:
               command:  npx
-              args: ["-y", "@gongrzhe/server-gmail-autoauth-mcp"]
+              args: ["-y", "@cocal/google-calendar-mcp"]
               env:
                 PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
                 HOME: /Users/dhananjai_dj

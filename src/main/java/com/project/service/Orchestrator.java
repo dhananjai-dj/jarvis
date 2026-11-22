@@ -2,8 +2,7 @@ package com.project.service;
 
 import com.project.dao.entities.Conversation;
 import com.project.dao.entities.Role;
-import com.project.dto.LLMResponse;
-import com.project.dto.StepResult;
+import com.project.dto.*;
 import com.project.util.Constants;
 import com.project.util.PiiMasker;
 import com.project.util.Transcriber;
@@ -25,8 +24,6 @@ import java.util.stream.Collectors;
 @Service
 public class Orchestrator {
     private static final Logger logger = LoggerFactory.getLogger(Orchestrator.class);
-
-    private static final int MAX_STEPS = 5;
 
     private static final Pattern COMPOUND_HINT =
             Pattern.compile("(?i)\\b(and|then|also|plus|after that|afterwards|as well)\\b|[,;]");
@@ -142,13 +139,14 @@ public class Orchestrator {
     }
 
     private LLMResponse runActionPlan(String history, String userQuery, String combined) {
-        List<String> tasks = planTasks(combined, userQuery);
+        TaskList taskList =  planTasks(combined, userQuery);
+        List<Task> tasks = taskList.tasks();
         logger.info("Action plan has {} step(s): {}", tasks.size(), tasks);
 
         List<StepResult> done = new ArrayList<>();
         for (int i = 0; i < tasks.size(); i++) {
-            String task = tasks.get(i);
-            LLMResponse response = executeStep(history, task, done);
+            Task task = tasks.get(i);
+            LLMResponse response = executeStep(history, task.description(), done, task.mcpName());
             done.add(new StepResult(task, response));
             logger.info("Step {}/{} [{}] -> {}", i + 1, tasks.size(), task, response);
             if (response.isError()) {
@@ -158,38 +156,22 @@ public class Orchestrator {
         return composeReply(userQuery, tasks, done);
     }
 
-    private List<String> planTasks(String combined, String userQuery) {
+    private TaskList planTasks(String combined, String userQuery) {
         if (!COMPOUND_HINT.matcher(userQuery).find()) {
-            return List.of(userQuery);
+            return TaskList.getSingleTask(userQuery);
         }
         try {
-            String raw = aiService.executeLLMCall(combined, Constants.Prompts.TASK_PLANNER, String.class);
-            List<String> tasks = new ArrayList<>();
-            if (raw != null) {
-                for (String line : raw.split("\\R")) {
-                    String task = line.strip().replaceFirst("^(?:[-*]|\\d+[.)])\\s*", "");
-                    if (!task.isBlank()) {
-                        tasks.add(task);
-                    }
-                }
-            }
-            if (tasks.size() > MAX_STEPS) {
-                logger.warn("Planner returned {} tasks, keeping the first {}", tasks.size(), MAX_STEPS);
-                tasks = new ArrayList<>(tasks.subList(0, MAX_STEPS));
-            }
-            if (!tasks.isEmpty()) {
-                return tasks;
-            }
+            return aiService.executeLLMCall(combined, Constants.Prompts.TASK_PLANNER, TaskList.class);
         } catch (Exception e) {
             logger.error("Error in planning tasks, falling back to a single step", e);
         }
-        return List.of(userQuery);
+        return TaskList.getSingleTask(userQuery);
     }
 
-    private LLMResponse executeStep(String history, String task, List<StepResult> done) {
+    private LLMResponse executeStep(String history, String task, List<StepResult> done, String serverName) {
         try {
             String routerQuery = combine(history, task);
-            List<ToolCallback> tools = getToolsToPerformAction(routerQuery);
+            List<ToolCallback> tools = getToolsToPerformAction(routerQuery, serverName);
 
             if (tools.isEmpty()) {
                 LLMResponse chat = aiService.getResponseFromAiAgent(routerQuery, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
@@ -204,7 +186,7 @@ public class Orchestrator {
         }
     }
 
-    private LLMResponse composeReply(String userQuery, List<String> tasks, List<StepResult> done) {
+    private LLMResponse composeReply(String userQuery, List<Task> tasks, List<StepResult> done) {
         if (tasks.size() == 1) {
             return done.getFirst().response();
         }
@@ -243,18 +225,18 @@ public class Orchestrator {
         return sb.append(')').toString();
     }
 
-    private List<ToolCallback> getToolsToPerformAction(String query) {
+    private List<ToolCallback> getToolsToPerformAction(String query, String serverName) {
         try {
-            String catalog = toolProvider.getTools().stream()
-                    .map(t -> t.key() + ": " + t.description())
+            String catalog = toolProvider.getTools(serverName).stream()
+                    .map(tool -> tool.name() + ": " + tool.description())
                     .collect(Collectors.joining("\n"));
-            String toolKeyString = aiService.executeLLMCall(query, Constants.Prompts.TOOL_IDENTIFIER.formatted(catalog), String.class);
-            List<String> toolKeys = Arrays.stream(toolKeyString.split(","))
+            ToolIdentifier toolIdentifier = aiService.executeLLMCall(query, Constants.Prompts.TOOL_IDENTIFIER.formatted(catalog), ToolIdentifier.class);
+            List<String> toolKeys = Arrays.stream(toolIdentifier.toolList().split(","))
                     .map(String::strip)
                     .filter(k -> !k.isEmpty())
                     .distinct()
                     .toList();
-            return toolProvider.getToolCallBack(toolKeys);
+            return toolProvider.getToolCallBack(toolKeys, toolIdentifier.mcpName());
         } catch (Exception e) {
             logger.error("Error in identifying tool to perform action", e);
         }

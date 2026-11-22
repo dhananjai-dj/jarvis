@@ -1,4 +1,4 @@
 package com.project.dto;
 
-public class Task {
+public record Task(String mcpName, String description) {
 }

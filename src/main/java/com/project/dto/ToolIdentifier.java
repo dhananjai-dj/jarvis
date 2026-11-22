@@ -1,4 +1,4 @@
 package com.project.dto;
 
-public record ToolIdentifer(String mcpName, String toolList) {
+public record ToolIdentifier(String mcpName, String toolList) {
 }

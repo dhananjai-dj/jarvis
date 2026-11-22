@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 @RestController
@@ -55,7 +56,7 @@ public class Miscellaneous {
     }
 
     @GetMapping("/list/tool")
-        public List<?> toolsList(){
+        public Map<String, ?> toolsList(){
         return toolFilter.getTools();
     }
 

@@ -10,12 +10,7 @@ import org.springframework.ai.mcp.SyncMcpToolCallback;
 import org.springframework.ai.tool.ToolCallback;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
+import java.util.*;
 
 @Service
 public class ToolProvider {
@@ -23,8 +18,8 @@ public class ToolProvider {
     private static final Logger logger = LoggerFactory.getLogger(ToolProvider.class);
 
     private final List<McpSyncClient> mcpSyncClients;
-    private volatile Map<String, ToolCallback> toolMap = Map.of();
-    private volatile List<Tool> tools = List.of();
+    private volatile Map<String, List<Tool>> serverToToolList = Map.of();
+    private volatile Map<String, Map<String, ToolCallback>> serverTotoolsMap = Map.of();
 
     public ToolProvider(List<McpSyncClient> mcpSyncClients) {
         this.mcpSyncClients = mcpSyncClients;
@@ -32,36 +27,43 @@ public class ToolProvider {
 
     @PostConstruct
     void init() {
-        Map<String, ToolCallback> map = new LinkedHashMap<>();
-        List<Tool> list = new ArrayList<>();
-
+        Map<String, Map<String, ToolCallback>> serverToToolMap = new LinkedHashMap<>();
+        Map<String, List<Tool>> serverToToolList = new LinkedHashMap<>();
         for (McpSyncClient client : mcpSyncClients) {
             try {
                 String serverName = client.getServerInfo().name();
+                Map<String, ToolCallback> clientMap = new HashMap<>();
+                List<Tool> list = new ArrayList<>();
                 for (McpSchema.Tool inputTool : client.listTools().tools()) {
                     McpSchema.Tool clean = sanitize(inputTool);
                     Tool tool = new Tool(clean.name(), serverName, firstSentence(clean.description()));
-                    map.put(tool.key(), SyncMcpToolCallback.builder()
+                    clientMap.put(clean.name(), SyncMcpToolCallback.builder()
                             .mcpClient(client)
                             .tool(clean)
                             .build());
                     list.add(tool);
                 }
+                serverToToolMap.put(serverName, clientMap);
+                serverToToolList.put(serverName, list);
             } catch (Exception e) {
                 logger.error("Error loading tools from MCP client", e);
             }
         }
-        this.toolMap = Collections.unmodifiableMap(map);
-        this.tools = List.copyOf(list);
+        this.serverTotoolsMap = Collections.unmodifiableMap(serverToToolMap);
+        this.serverToToolList = Collections.unmodifiableMap(serverToToolList);
     }
 
-    public List<Tool> getTools() {
-        return tools;
+    public List<Tool> getTools(String serverName) {
+        return serverToToolList.get(serverName);
     }
 
-    public List<ToolCallback> getToolCallBack(List<String> toolKeys) {
+    public Map<String, List<Tool>> getTools() {
+        return serverToToolList;
+    }
+
+    public List<ToolCallback> getToolCallBack(List<String> toolKeys, String mcpName) {
         return toolKeys.stream()
-                .map(toolMap::get)
+                .map(serverTotoolsMap.get(mcpName)::get)
                 .filter(Objects::nonNull)
                 .toList();
     }
