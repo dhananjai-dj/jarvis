@@ -76,7 +76,7 @@ public class Orchestrator {
 
             saveUserConversation(sessionId, userQuery, filePath + Constants.INPUT_RECORDING_FILE_NAME);
 
-            LLMResponse llmOutput = handleUserQuery(sessionId, userQuery);
+            JarvisResponse llmOutput = handleUserQuery(sessionId, userQuery);
             logger.info("Output from ml: {}", llmOutput);
 
             String botReply = PiiMasker.unMaskValue(llmOutput.result());
@@ -115,13 +115,13 @@ public class Orchestrator {
         }
     }
 
-    private LLMResponse handleUserQuery(String sessionId, String userQuery) {
+    private JarvisResponse handleUserQuery(String sessionId, String userQuery) {
         String history = getHistoryBlock(sessionId);
         String combined = combine(history, userQuery);
         logger.info("Combined user query {}", combined);
-        LLMResponse result;
+        JarvisResponse result;
         try {
-            LLMResponse first = aiService.getResponseFromAiAgent(combined, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
+            JarvisResponse first = aiService.getResponseFromAiAgent(combined, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
             if (!first.isToolCallingRequired()) {
                 result = first;
             } else {
@@ -129,13 +129,13 @@ public class Orchestrator {
             }
         } catch (Exception e) {
             logger.error("Error in processing user query", e);
-            result = LLMResponse.defaultResponse();
+            result = JarvisResponse.defaultResponse();
         }
         conversationService.saveConversation(sessionId, result);
         return result;
     }
 
-    private LLMResponse runActionPlan(String history, String userQuery, String combined) {
+    private JarvisResponse runActionPlan(String history, String userQuery, String combined) {
         TaskList taskList = planTasks(combined, userQuery);
         List<Task> tasks = taskList.tasks();
         logger.info("Action plan has {} step(s): {}", tasks.size(), tasks);
@@ -143,7 +143,7 @@ public class Orchestrator {
         List<StepResult> done = new ArrayList<>();
         for (int i = 0; i < tasks.size(); i++) {
             Task task = tasks.get(i);
-            LLMResponse response = executeStep(history, task.description(), done, task.mcpName());
+            JarvisResponse response = executeStep(history, task.description(), done, task.mcpName());
             done.add(new StepResult(task, response));
             logger.info("Step {}/{} [{}] -> {}", i + 1, tasks.size(), task, response);
             if (response.isError()) {
@@ -163,27 +163,27 @@ public class Orchestrator {
         return TaskList.getSingleTask(userQuery);
     }
 
-    private LLMResponse executeStep(String history, String task, List<StepResult> done, String mcpName) {
+    private JarvisResponse executeStep(String history, String task, List<StepResult> done, String mcpName) {
         try {
             String routerQuery = combine(history, task);
             List<ToolCallback> tools = getToolsToPerformAction(routerQuery, mcpName);
 
             if (tools.isEmpty()) {
-                LLMResponse chat = aiService.getResponseFromAiAgent(routerQuery, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
-                return chat.isToolCallingRequired() ? new LLMResponse(NO_TOOL_REPLY, true, true) : chat;
+                JarvisResponse chat = aiService.getResponseFromAiAgent(routerQuery, Constants.Prompts.PRIMARY_AGENT_SYSTEM_INSTRUCTION);
+                return chat.isToolCallingRequired() ? new JarvisResponse(NO_TOOL_REPLY, true, true) : chat;
             }
 
             String executionQuery = combine(history, task + stepContext(done));
             ToolRunResult toolRunResult = aiService.performToolCalling(executionQuery, tools);
             logger.info("Tool result {}", toolRunResult);
-            return new LLMResponse(toolRunResult.finalText(), true, toolRunResult.isFailed());
+            return new JarvisResponse(toolRunResult.finalText(), true, toolRunResult.isFailed());
         } catch (Exception e) {
             logger.error("Error in executing step [{}]", task, e);
-            return LLMResponse.defaultResponse();
+            return JarvisResponse.defaultResponse();
         }
     }
 
-    private LLMResponse composeReply(String userQuery, List<Task> tasks, List<StepResult> done) {
+    private JarvisResponse composeReply(String userQuery, List<Task> tasks, List<StepResult> done) {
         if (tasks.size() == 1) {
             return done.getFirst().response();
         }
@@ -194,7 +194,7 @@ public class Orchestrator {
             for (int i = 0; i < tasks.size(); i++) {
                 input.append(i + 1).append(". Task: ").append(tasks.get(i)).append('\n');
                 if (i < done.size()) {
-                    LLMResponse r = done.get(i).response();
+                    JarvisResponse r = done.get(i).response();
                     input.append("   Status: ").append(r.isError() ? "FAILED OR NEEDS INPUT" : "DONE").append('\n');
                     input.append("   Report: ").append(r.result()).append('\n');
                 } else {
@@ -208,7 +208,7 @@ public class Orchestrator {
         if (StringUtils.isEmpty(reply) || reply.isBlank()) {
             reply = done.stream().map(s -> s.response().result()).collect(Collectors.joining(" "));
         }
-        return new LLMResponse(reply.strip(), true, anyError);
+        return new JarvisResponse(reply.strip(), true, anyError);
     }
 
     private String stepContext(List<StepResult> done) {

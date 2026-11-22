@@ -1,6 +1,6 @@
 package com.project.service;
 
-import com.project.dto.LLMResponse;
+import com.project.dto.JarvisResponse;
 import com.project.dto.ToolRunResult;
 import com.project.util.Constants;
 import com.project.util.RateLimiter;
@@ -31,22 +31,22 @@ public class AiService {
     }
 
     @CircuitBreaker(name = "aiService", fallbackMethod = "getResponseFromSecondaryAiAgent")
-    public LLMResponse getResponseFromAiAgent(String query, String prompt) {
+    public JarvisResponse getResponseFromAiAgent(String query, String prompt) {
         try {
-            return executeLLMCall(primaryAgent, query, prompt, LLMResponse.class);
+            return executeLLMCall(primaryAgent, query, prompt, JarvisResponse.class);
         } catch (Exception e) {
             logger.error("Error in getting LLM Response from Primary Agent{}", e.getMessage());
         }
         throw new RuntimeException("Error in processing request");
     }
 
-    public LLMResponse getResponseFromSecondaryAiAgent(String query, String prompt, Throwable t) {
+    public JarvisResponse getResponseFromSecondaryAiAgent(String query, String prompt, Throwable t) {
         try {
-            return executeLLMCall(secondaryAgent, query, prompt, LLMResponse.class);
+            return executeLLMCall(secondaryAgent, query, prompt, JarvisResponse.class);
         } catch (Exception e) {
             logger.error("Error in getting LLM Response from Secondary Agent{}", e.getMessage());
         }
-        return LLMResponse.defaultResponse();
+        return JarvisResponse.defaultResponse();
     }
 
     public ToolRunResult performToolCalling(String query, List<ToolCallback> tools) {
