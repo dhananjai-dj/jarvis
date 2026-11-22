@@ -37,7 +37,7 @@ public class Miscellaneous {
     @GetMapping("/stt")
     public String getText() throws Exception {
         File file = new File("/Users/dhananjai_dj/dev/jarvis-test/test-recording.wav");
-        return transcriber.transcribe(file);
+        return transcriber.transcribes(file);
     }
 
     @GetMapping("/speak")

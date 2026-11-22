@@ -59,7 +59,7 @@ public class Orchestrator {
         );
         waitingThread.start();
         try {
-            String userQuery = transcriber.transcribe(wav);
+            String userQuery = transcriber.transcribes(wav);
             if (StringUtils.isEmpty(userQuery)) {
                 throw new RuntimeException("Empty transcriber response !!!");
             }

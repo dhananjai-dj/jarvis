@@ -4,6 +4,7 @@ import com.project.dto.WhisperResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.FileSystemResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.LinkedMultiValueMap;
@@ -19,12 +20,17 @@ public class Transcriber {
 
     private final RestClient transcriber;
 
+    @Value("${transcriber.model:}")
+    private String model;
+    @Value("${transcriber.endPoint:}")
+    private String endPoint;
+
 
     public Transcriber(@Qualifier("Transcriber") RestClient transcriber) {
         this.transcriber = transcriber;
     }
 
-    public String transcribe(File wavFile) {
+    public String transcribes(File wavFile) {
         String result = "";
         try {
             if (wavFile == null) {
@@ -32,9 +38,11 @@ public class Transcriber {
             }
             MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
             body.add("file", new FileSystemResource(wavFile));
+            body.add("model", model);
             body.add("response_format", "json");
+            body.add("temperature", "0.0");
             WhisperResponse response = transcriber.post()
-                    .uri("/inference")
+                    .uri(endPoint)
                     .contentType(org.springframework.http.MediaType.MULTIPART_FORM_DATA)
                     .body(body)
                     .retrieve()
