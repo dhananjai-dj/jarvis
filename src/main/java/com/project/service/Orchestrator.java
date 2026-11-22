@@ -205,7 +205,7 @@ public class Orchestrator {
         } catch (Exception e) {
             logger.error("Error in composing the final reply", e);
         }
-        if (StringUtils.isEmpty(reply) || reply.isBlank()) {
+        if (StringUtils.isEmpty(reply)) {
             reply = done.stream().map(s -> s.response().result()).collect(Collectors.joining(" "));
         }
         return new JarvisResponse(reply.strip(), true, anyError);
