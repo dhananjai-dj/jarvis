@@ -20,13 +20,13 @@ public class Transcriber {
 
     private final RestClient transcriber;
 
-    @Value("${transcriber.model:}")
+    @Value("${groq.transcriber.model:}")
     private String model;
-    @Value("${transcriber.endPoint:}")
+    @Value("${groq.transcriber.endPoint:}")
     private String endPoint;
 
 
-    public Transcriber(@Qualifier("Transcriber") RestClient transcriber) {
+    public Transcriber(@Qualifier("groqRestClient") RestClient transcriber) {
         this.transcriber = transcriber;
     }
 

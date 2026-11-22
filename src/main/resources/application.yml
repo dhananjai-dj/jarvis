@@ -82,8 +82,15 @@ logging:
     root: INFO
     io.modelcontextprotocol: DEBUG
 
-transcriber:
+groq:
   baseUrl: https://api.groq.com/openai/v1
-  endPoint: /audio/transcriptions
   key: ${GROQ_API_KEY}
-  model: whisper-large-v3-turbo
+  transcriber:
+    endPoint: /audio/transcriptions
+    model: whisper-large-v3-turbo
+  synthesizer:
+    endPoint: /audio/speech
+    model: canopylabs/orpheus-v1-english
+    voice: troy
+
+

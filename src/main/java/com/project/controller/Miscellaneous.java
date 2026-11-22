@@ -42,7 +42,7 @@ public class Miscellaneous {
 
     @GetMapping("/speak")
     public void speak() throws Exception {
-        File wav = synthesizer.synthesize("Please wait While I am looking into it", "waiting_message.wav");
+        File wav = synthesizer.synthesizes("On it Sir!", "waiting_message.wav");
         synthesizer.speak(wav);
     }
 

@@ -3,22 +3,44 @@ package com.project.util;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
 import javax.sound.sampled.*;
 import java.io.File;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class Synthesizer {
     private static final Logger logger = LoggerFactory.getLogger(Synthesizer.class);
 
-    private final File waitMessageFile = new File("waiting_message.wav");
+    private final File errorMessageFile = new File("error_message.wav");
+    private final File waitingMessageFile = new File("waiting_message.wav");
+
+    @Value("${groq.synthesizer.model:}")
+    private String model;
+    @Value("${groq.synthesizer.endPoint:}")
+    private String endPoint;
+    @Value("${groq.synthesizer.voice:}")
+    private String voice;
+
+    private final RestClient restClient;
 
     private SourceDataLine speaker;
 
     private volatile boolean stopRequested = false;
+
+    public Synthesizer(@Qualifier("groqRestClient") RestClient restClient) {
+        this.restClient = restClient;
+    }
 
     public void resetStop() {
         this.stopRequested = false;
@@ -28,27 +50,33 @@ public class Synthesizer {
         return this.stopRequested;
     }
 
-    public File synthesize(String text, String filePath) throws IOException, InterruptedException {
-        File outputFile = new File(filePath + Constants.OUTPUT_RECORDING_FILE_NAME);
-        outputFile.getParentFile().mkdirs();
-        ProcessBuilder processBuilder = new ProcessBuilder(
-                Constants.PIPER_PATH,
-                "--model", Constants.MODEL_PATH,
-                "--output_file", outputFile.getAbsolutePath()
-        );
-        processBuilder.redirectErrorStream(false);
-        Process process = processBuilder.start();
-
-        try (OutputStream stdin = process.getOutputStream()) {
-            stdin.write(text.getBytes());
+    public File synthesizes(String text, String filePath) {
+        try {
+            Path targetPath = Path.of(filePath, "");
+            if (targetPath.getParent() != null) {
+                Files.createDirectories(targetPath.getParent());
+            }
+            Map<String, String> body = new HashMap<>();
+            body.put("response_format", "wav");
+            body.put("voice", voice);
+            body.put("model", model);
+            body.put("input", text);
+            byte[] audioBytes = restClient.post()
+                    .uri(endPoint)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .accept(MediaType.APPLICATION_OCTET_STREAM, new MediaType("audio", "wav"))
+                    .body(body)
+                    .retrieve()
+                    .body(byte[].class);
+            if (audioBytes != null && audioBytes.length != 0) {
+                Files.write(targetPath, audioBytes);
+                return targetPath.toFile();
+            }
+            logger.error("Got empty file from synthesiser for the content {}", text);
+        } catch (Exception e) {
+            logger.error("Error in synthesizing {}", e.getMessage());
         }
-
-        int exitCode = process.waitFor();
-        if (exitCode != 0) {
-            throw new RuntimeException("Piper process failed with exit code " + exitCode);
-        }
-
-        return outputFile;
+        return errorMessageFile;
     }
 
     public void speak(File file) {
@@ -82,7 +110,7 @@ public class Synthesizer {
         try {
             Thread.sleep(2000);
             if (!isStopRequested()) {
-                speak(waitMessageFile);
+                speak(waitingMessageFile);
             }
         } catch (Exception e) {
             logger.info("Waiting message stopped because of error");

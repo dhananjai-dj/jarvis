@@ -77,7 +77,7 @@ public class Orchestrator {
 
             stopWaitingThread(waitingThread);
 
-            File outputFile = synthesizer.synthesize(botReply, filePath);
+            File outputFile = synthesizer.synthesizes(botReply, filePath);
             synthesizer.speak(outputFile);
         } catch (Exception e) {
             stopWaitingThread(waitingThread);

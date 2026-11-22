@@ -6,14 +6,14 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.web.client.RestClient;
 
 @Configuration
-public class TranscriberConfig {
-    @Value("${transcriber.baseUrl:}")
+public class RestClientConfig {
+    @Value("${groq.baseUrl:}")
     private String baseUrl;
-    @Value("${transcriber.key:}")
+    @Value("${groq.key:}")
     private String apiKey;
 
-    @Bean(name = "Transcriber")
-    public RestClient getTranscriber() {
+    @Bean(name = "groqRestClient")
+    public RestClient getRestClient() {
         return RestClient.builder().baseUrl(baseUrl).defaultHeader("Authorization", "Bearer " + apiKey).build();
     }
 }
