@@ -49,12 +49,12 @@ public class QueryExecutionService {
 
     private JarvisResponse runActionPlan(String history, String userQuery, String combined) {
         TaskList taskList = planTasks(combined, userQuery);
-        List<Task> tasks = taskList.tasks();
+        List<TaskList.Task> tasks = taskList.tasks();
         logger.info("Action plan has {} step(s): {}", tasks.size(), tasks);
 
         List<StepResult> done = new ArrayList<>();
         for (int i = 0; i < tasks.size(); i++) {
-            Task task = tasks.get(i);
+            TaskList.Task task = tasks.get(i);
             JarvisResponse response = executeStep(history, task.description(), done, task.mcpName());
             done.add(new StepResult(task, response));
             logger.info("Step {}/{} [{}] -> {}", i + 1, tasks.size(), task, response);
@@ -95,7 +95,7 @@ public class QueryExecutionService {
         }
     }
 
-    private JarvisResponse composeReply(String userQuery, List<Task> tasks, List<StepResult> done) {
+    private JarvisResponse composeReply(String userQuery, List<TaskList.Task> tasks, List<StepResult> done) {
         if (tasks.size() == 1) {
             return done.getFirst().response();
         }

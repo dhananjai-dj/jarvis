@@ -8,4 +8,8 @@ public record TaskList(List<Task> tasks) {
         Task task = new Task("NONE", userQuery);
         return new TaskList(List.of(task));
     }
+
+    public record Task(String mcpName, String description) {
+    }
 }
+

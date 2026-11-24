@@ -23,7 +23,7 @@ public class ChatClientConfig {
 
 
     @Bean(name = "secondaryAgent")
-    public ChatClient getLocalChatClient(@Qualifier("openAiChatModel") ChatModel chatModel) {
+    public ChatClient getSecondaryChatClient(@Qualifier("openAiChatModel") ChatModel chatModel) {
         return ChatClient.builder(chatModel)
                 .defaultOptions(ChatOptions.builder()
                         .maxTokens(800))

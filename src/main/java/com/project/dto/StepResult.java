@@ -1,4 +1,4 @@
 package com.project.dto;
 
-public record StepResult(Task task, JarvisResponse response) {}
+public record StepResult(TaskList.Task task, JarvisResponse response) {}
 

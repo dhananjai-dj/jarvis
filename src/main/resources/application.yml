@@ -13,8 +13,8 @@ spring:
                 PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
                 HOME: /Users/dhananjai_dj
             google-calendar:
-              command:  npx
-              args: ["-y", "@cocal/google-calendar-mcp"]
+              command: npx
+              args: [ "-y", "@cocal/google-calendar-mcp" ]
               env:
                 PATH: /opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin
                 HOME: /Users/dhananjai_dj
@@ -46,6 +46,16 @@ spring:
       api-key: ${GROQ_API_KEY}
       chat:
         model: qwen/qwen3.8-27b
+    model:
+      embedding: none
+    vectorstore:
+      qdrant:
+        host: c4865baa-8859-49c0-8bb0-36107e15fe2a.ap-northeast-2-0.aws.cloud.qdrant.io
+        port: 6334
+        api-key: ${QDRANT_API_KEY}
+        collection-name: jarvis
+        use-tls: true
+        initialize-schema: true
   cloud:
     circuitbreaker:
       resilience4j:
@@ -92,4 +102,9 @@ groq:
     model: canopylabs/orpheus-v1-english
     voice: troy
 
-
+jena:
+  baseUrl: https://api.jina.ai/v1
+  endPoint: /embeddings
+  key: ${JINA_API_KEY}
+  model: jina-embeddings-v3
+  dimension: 1024

@@ -8,12 +8,26 @@ import org.springframework.web.client.RestClient;
 @Configuration
 public class RestClientConfig {
     @Value("${groq.baseUrl:}")
-    private String baseUrl;
+    private String groqBaseUrl;
     @Value("${groq.key:}")
-    private String apiKey;
+    private String groqApiKey;
+
+    @Value("${jena.baseUrl:}")
+    private String jenaBaseUrl;
+    @Value("${jena.key:}")
+    private String jenaApiKey;
 
     @Bean(name = "groqRestClient")
-    public RestClient getRestClient() {
+    public RestClient getGroqRestClient() {
+        return buildRestClient(groqBaseUrl, groqApiKey);
+    }
+
+    @Bean(name = "jenaRestClient")
+    public RestClient getJenaRestClient() {
+        return buildRestClient(jenaBaseUrl, jenaApiKey);
+    }
+
+    private RestClient buildRestClient(String baseUrl, String apiKey) {
         return RestClient.builder().baseUrl(baseUrl).defaultHeader("Authorization", "Bearer " + apiKey).build();
     }
 }

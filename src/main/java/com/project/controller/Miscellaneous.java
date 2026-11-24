@@ -1,7 +1,7 @@
 package com.project.controller;
 
 import com.project.service.AiService;
-import com.project.service.Orchestrator;
+import com.project.util.RAG;
 import com.project.util.Synthesizer;
 import com.project.util.ToolProvider;
 import com.project.util.Transcriber;
@@ -11,10 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.io.File;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 @RestController
 @RequestMapping("/misc")
@@ -31,7 +28,7 @@ public class Miscellaneous {
     @Autowired
     ToolProvider toolFilter;
     @Autowired
-    Orchestrator orchestrator;
+    RAG rag;
 
 
     @GetMapping("/stt")
@@ -60,5 +57,11 @@ public class Miscellaneous {
         return toolFilter.getTools();
     }
 
+    @GetMapping("/add/doc")
+    public void push(){
+        Map<String, Object> map = new HashMap<>();
+        map.put("Name", "Jarvis");
+        rag.pushData("Hello Jarvis!", map);
+    }
 
 }
