@@ -25,7 +25,7 @@ public class RAG {
             Document document = new Document(data, metaData);
             vectorStore.add(List.of(document));
         } catch (Exception e) {
-            logger.error("Error in processing document {}", e);
+            logger.error("Error in processing document {}", e.getMessage());
         }
     }
 }
